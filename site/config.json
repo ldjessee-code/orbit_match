@@ -1,0 +1,27 @@
+{
+  "config": 1,
+  "pages": {
+    "orbit_match": "https://ldjessee-code.github.io/orbit_match/",
+    "starroute": "https://ldjessee-code.github.io/jumpgate_starroute/",
+    "starroute_map": "https://ldjessee-code.github.io/jumpgate_starroute/app.html",
+    "starroute_lore": "https://ldjessee-code.github.io/jumpgate_starroute/docs/lore/"
+  },
+  "repos": {
+    "orbit_match": "https://github.com/ldjessee-code/orbit_match",
+    "starroute": "https://github.com/ldjessee-code/jumpgate_starroute"
+  },
+  "other_page": "https://ldjessee-code.github.io/jumpgate_starroute/app.html",
+  "setting": {
+    "id": "crowded",
+    "title": "Crowded — Turquenish neighborhood",
+    "lore": "https://ldjessee-code.github.io/jumpgate_starroute/docs/lore/#crowded/overview",
+    "map": "https://ldjessee-code.github.io/jumpgate_starroute/presets/crowded/map.json",
+    "pages": [
+      { "id": "crowded/overview", "title": "Crowded — Turquenish neighborhood" },
+      { "id": "crowded/humans", "title": "Crowded — human polities" },
+      { "id": "crowded/aliens", "title": "Crowded — local aliens" },
+      { "id": "crowded/war", "title": "Crowded — the war" },
+      { "id": "crowded/travel", "title": "Crowded — gates and travel" }
+    ]
+  }
+}

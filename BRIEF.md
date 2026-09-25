@@ -80,13 +80,13 @@ The star map can write this. Orbit Match can write the `system_file` path back o
 
 ### Where the other page lives
 
-Each program stores one address: where the other page is open. The shipped page has the public GitHub Pages address of its sibling. A local copy replaces that with the address used on that machine. The handoff fields are the same either way.
+Each program stores the addresses in a JSON file. Orbit Match's copy is [site/config.json](site/config.json). The shipped file points at the public GitHub Pages addresses. A local copy edits that file. The handoff fields are the same either way.
 
-Jumpgate Starroute's setting points at Orbit Match. Orbit Match's setting points back.
+`other_page` is the star map page this program calls. `pages` lists the public homes, the map, and the lore. `setting` is the default neighborhood: `crowded`, the Turquenish pages, and that pack's map file. Jumpgate Starroute's own setting points back at Orbit Match.
 
 ```text
-other_page = https://ldjessee-code.github.io/orbit_match/
-other_page = http://127.0.0.1:8080/
+other_page = https://ldjessee-code.github.io/jumpgate_starroute/app.html
+other_page = http://127.0.0.1:8080/app.html
 ```
 
 The call is that address, a hash, then the thin card as parameters (`h=1`, `host`, `from`, and the rest). The hash stays in the browser. A blank address means the page does not open the other one. The handoff file still saves and opens by hand.
@@ -123,7 +123,7 @@ A server waits until the page cannot do the job. The first job that would need o
 
 **First page.** Build step 1, and the ballpark half of step 2. Close, accurate, and layered generation are later work in the same page, in the order above.
 
-**Where the page lives.** `site/index.html` is the program. Styles and scripts sit under `site/`. These notes stay at the repository root.
+**Where the page lives.** `site/index.html` is the program. Styles and scripts sit under `site/`. `site/config.json` holds the sibling addresses and the default setting. These notes stay at the repository root.
 
 ## License
 

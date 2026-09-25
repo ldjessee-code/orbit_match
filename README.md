@@ -4,7 +4,7 @@ In-system navigation for the same stars Jumpgate Starroute links together.
 
 Leave one orbit and arrive on another already matched, instead of flying past the destination. Planets, moons, belts, stations, and the burn between them live here. Routes between stars do not.
 
-The page is [https://ldjessee-code.github.io/orbit_match/](https://ldjessee-code.github.io/orbit_match/). It is the `site/` folder, published by GitHub Actions. `site/config.js` holds the address of the star map. A local copy changes that one line.
+The page is [https://ldjessee-code.github.io/orbit_match/](https://ldjessee-code.github.io/orbit_match/). It is the `site/` folder, published by GitHub Actions. [site/config.json](site/config.json) holds the GitHub Pages addresses and the default setting, the crowded Turquenish neighborhood. A local copy edits that file.
 
 | Read | What it is |
 | --- | --- |

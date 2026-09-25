@@ -78,6 +78,21 @@ The star map can write this. Orbit Match can write the `system_file` path back o
 
 `known_planet_count` is what the NASA tables published. It is not a mainworld, and it is not a gravity or an atmosphere.
 
+### Where the other page lives
+
+Each program stores one address: where the other page is open. The shipped page has the public GitHub Pages address of its sibling. A local copy replaces that with the address used on that machine. The handoff fields are the same either way.
+
+Jumpgate Starroute's setting points at Orbit Match. Orbit Match's setting points back.
+
+```text
+other_page = https://ldjessee-code.github.io/orbit_match/
+other_page = http://127.0.0.1:8080/
+```
+
+The call is that address, a hash, then the thin card as parameters (`h=1`, `host`, `from`, and the rest). The hash stays in the browser. A blank address means the page does not open the other one. The handoff file still saves and opens by hand.
+
+A hosted page can call any http or https address. It cannot open a folder on the visitor's computer. Two copies on one machine call each other by the local address each is served at. `system_file` stays a path to the system JSON. That path is a different setting from the page address.
+
 ## Build order
 
 1. Open one star from a handoff file. Edit bodies and orbits by hand. Save a system file the map can point at.
@@ -92,7 +107,7 @@ Decided 2026-09-25. A referee opens a page. Nothing is installed.
 
 **Page.** HTML, CSS, and JavaScript. One folder is the program on Mac, Windows, and Linux, hosted or copied onto a disk.
 
-**Files.** The page opens a handoff JSON file and saves a system JSON file. On one computer, Jumpgate Starroute stores that path in `system_file`. On a hosted site, the person saves the file from one page and opens it in the other. The two pages pass a file. They do not share an account or a database.
+**Files.** The page opens a handoff JSON file and saves a system JSON file. On one computer, Jumpgate Starroute stores that path in `system_file`. Either page can also open the other, locally or hosted, at the address stored in its settings. The call carries the thin card in the hash. A blank address leaves the file as the handoff. The two pages share no account and no database.
 
 **Transfers.** JavaScript does the arithmetic. Ballpark and close use Kepler: period, a transfer ellipse, a window, and the arrival burn. Accurate follows the bodies with a numerical trajectory. One star system is a small calculation.
 

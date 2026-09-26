@@ -38,7 +38,7 @@ One star. The hash stays in the browser. Do not put the solar system, the route 
 | `x`, `y`, `z` | Light-years |
 | `planets` | NASA planet count. Not a world, and not a gravity |
 | `concept` | High concept |
-| `port` | Port class |
+| `port` | `none`, `minor`, `standard`, or `major`. Leave it off when the card is blank |
 | `holder` | Faction that holds the star |
 | `tag` | Tag, repeated |
 | `svc` | Service, repeated |

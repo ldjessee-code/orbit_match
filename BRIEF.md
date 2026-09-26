@@ -78,6 +78,8 @@ The star map can write this. Orbit Match can write the `system_file` path back o
 
 `known_planet_count` is what the NASA tables published. It is not a mainworld, and it is not a gravity or an atmosphere.
 
+`port` uses the star map's words: blank, `none`, `minor`, `standard`, or `major`.
+
 ### Where the other page lives
 
 Each program stores the addresses in a JSON file. Orbit Match's copy is [site/config.json](site/config.json). The shipped file points at the public GitHub Pages addresses. A local copy edits that file. The handoff fields are the same either way.

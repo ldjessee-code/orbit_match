@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build a system · Orbit Match</title>
+<link rel="stylesheet" href="../css/site.css">
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<header>
+  <strong>Orbit Match</strong>
+  <nav>
+    <a href="../">Home</a>
+    <a id="star-map" href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
+    <a href="https://github.com/ldjessee-code/orbit_match/blob/main/INTERCONNECT.md">Interconnect</a>
+  </nav>
+</header>
+<main>
+  <p class="intro">Build one system by hand. The star stays at the start. Each step away from it is the next orbit. On a phone the orbits run down the page. On a wide screen they run across.</p>
+  <p class="status" id="status">Loading the star list…</p>
+  <div class="system" id="system">
+    <section class="star-card" id="star-card">
+      <div class="star-head">
+        <h1 id="host-name">No star yet</h1>
+        <p id="spec-type">Spectral type unknown</p>
+      </div>
+      <div class="finder">
+        <label>Star
+          <input id="star-search" type="search" placeholder="Search the star list" autocomplete="off">
+        </label>
+        <ul id="star-results" class="results" hidden></ul>
+      </div>
+      <div class="actions">
+        <label class="file-btn">Star list CSV
+          <input id="star-file" type="file" accept=".csv,text/csv">
+        </label>
+        <label class="file-btn">Open a system
+          <input id="system-file" type="file" accept=".json,application/json">
+        </label>
+      </div>
+      <div class="grid">
+        <label>Setting name
+          <input data-header="setting_name">
+        </label>
+        <label>Spectral type
+          <input data-header="spectype">
+        </label>
+        <label>Mass (sun)
+          <input data-header="mass" inputmode="decimal">
+        </label>
+        <label>Luminosity (log sun)
+          <input data-header="lum" inputmode="decimal">
+        </label>
+        <label>Temperature (K)
+          <input data-header="teff" inputmode="decimal">
+        </label>
+        <label>Known planets
+          <input data-header="planets" inputmode="numeric">
+        </label>
+        <label class="wide">High concept
+          <input data-header="concept">
+        </label>
+        <label>Faction
+          <input data-header="holder">
+        </label>
+        <label>Port
+          <input data-header="port">
+        </label>
+        <label>Fuel cost
+          <input data-header="fuel" inputmode="decimal">
+        </label>
+        <label>Fuel unit
+          <input data-header="fuel_unit" placeholder="tons, units…">
+        </label>
+        <label class="wide">Services
+          <input data-header="services" placeholder="fuel, repair, trade">
+        </label>
+      </div>
+      <p class="note" id="zone-note"></p>
+      <div class="actions">
+        <button type="button" id="add-body">Add an orbital object</button>
+        <button type="button" id="save-system">Save this system</button>
+      </div>
+    </section>
+    <div class="stack" id="stack"></div>
+  </div>
+</main>
+<footer>Lloyd Douglass Jessee, 2026. MIT License.</footer>
+<script src="orbit.js"></script>
+<script src="manual.js"></script>
+</body>
+</html>

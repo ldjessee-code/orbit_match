@@ -4,8 +4,10 @@
     "orbit_match": "https://ldjessee-code.github.io/orbit_match/",
     "starroute": "https://ldjessee-code.github.io/jumpgate_starroute/",
     "starroute_map": "https://ldjessee-code.github.io/jumpgate_starroute/app.html",
-    "starroute_lore": "https://ldjessee-code.github.io/jumpgate_starroute/docs/lore/"
+    "starroute_lore": "https://ldjessee-code.github.io/jumpgate_starroute/docs/lore/",
+    "manual": "https://ldjessee-code.github.io/orbit_match/manual/"
   },
+  "star_list": "https://ldjessee-code.github.io/jumpgate_starroute/sample-systems.csv",
   "repos": {
     "orbit_match": "https://github.com/ldjessee-code/orbit_match",
     "starroute": "https://github.com/ldjessee-code/jumpgate_starroute"

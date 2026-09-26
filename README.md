@@ -12,7 +12,7 @@ A trip can be run at three fidelities.
 | Close | The transfer's shape, and the window when the destination is in place. Includes the gravity of the world you leave and the world you arrive at. |
 | Accurate | A trajectory that also includes the large bodies. A swing past one of them can stand in for fuel on the way. Arrival is still a match burn. |
 
-The page is [https://ldjessee-code.github.io/orbit_match/](https://ldjessee-code.github.io/orbit_match/).
+The page is [https://ldjessee-code.github.io/orbit_match/](https://ldjessee-code.github.io/orbit_match/). [Build a system](https://ldjessee-code.github.io/orbit_match/manual/) from the star list, or from a CSV the star map saved.
 
 ## Jumpgate Starroute
 

@@ -91,6 +91,8 @@ other_page = http://127.0.0.1:8080/app.html
 
 The call is that address, a hash, then the thin card as parameters (`h=1`, `host`, `from`, and the rest). The hash stays in the browser. A blank address means the page does not open the other one. The handoff file still saves and opens by hand.
 
+The builder is `site/manual/`. A star card on the map should open that page in a new window. The note for that work is [INTERCONNECT.md](INTERCONNECT.md). Until the map has the link, the builder loads the public star list, or a CSV the map saved.
+
 A hosted page can call any http or https address. It cannot open a folder on the visitor's computer. Two copies on one machine call each other by the local address each is served at. `system_file` stays a path to the system JSON. That path is a different setting from the page address.
 
 ## Build order

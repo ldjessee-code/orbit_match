@@ -156,6 +156,10 @@
     var place = placeHz(bodies, hz, mass);
     var rows = [];
     if (!place) {
+      if (hz) {
+        rows.push({ type: "hz", edge: "inner" });
+        rows.push({ type: "hz", edge: "outer" });
+      }
       for (var n = 0; n < bodies.length; n++) rows.push({ type: "body", body: bodies[n] });
       return rows;
     }

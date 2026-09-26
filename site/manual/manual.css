@@ -101,6 +101,14 @@ button { cursor: pointer; }
   padding-top: 0.3rem;
 }
 
+.hz-range {
+  margin: 0.45rem 0.6rem;
+  color: var(--gold-ink);
+  font-weight: 650;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .body-card { border-width: 1px; }
 .card-tools { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.6rem; }
 .card-tools button { padding: 0.25rem 0.45rem; font-size: 0.85rem; }
@@ -123,7 +131,7 @@ details summary { cursor: pointer; margin: 0.4rem 0; }
     transform: rotate(180deg);
     align-self: stretch;
   }
-  .band-gold { align-items: stretch; }
+  .band-gold { align-items: stretch; min-width: 8.5rem; justify-content: center; }
   .results { position: relative; }
 }
 

@@ -94,7 +94,7 @@
     if (!state.hz) return "The goldilocks band appears once the star has a luminosity or a radius and temperature.";
     var a = state.hz.inner.toFixed(2);
     var b = state.hz.outer.toFixed(2);
-    return "Goldilocks zone " + a + "–" + b + " AU. The band marks the page once a body has a period or a distance.";
+    return "Goldilocks zone " + a + "–" + b + " AU, from this star's luminosity. A body sits in the band when its distance is inside that range.";
   }
 
   function paintStar() {
@@ -185,6 +185,12 @@
         gold = document.createElement("div");
         gold.className = "band band-gold";
         gold.appendChild(hzLabel("inner"));
+        if (state.hz) {
+          var range = document.createElement("p");
+          range.className = "hz-range";
+          range.textContent = state.hz.inner.toFixed(2) + "–" + state.hz.outer.toFixed(2) + " AU";
+          gold.appendChild(range);
+        }
         stack.appendChild(gold);
         parent = gold;
         return;

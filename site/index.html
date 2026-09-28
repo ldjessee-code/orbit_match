@@ -8,20 +8,25 @@
 <script src="js/theme.js"></script>
 </head>
 <body>
-<header>
-  <strong>Orbit Match</strong>
+<header class="site-head">
+  <div class="head-row">
+    <strong>Orbit Match</strong>
+    <div class="head-tools">
+      <a class="help-docs" href="help/">Help</a>
+      <span class="scheme-label">Color scheme</span>
+      <button type="button" id="help-mode" class="help-mode-btn" aria-label="Context help">?</button>
+      <select id="color-theme" aria-label="Color scheme">
+        <option value="light">Light</option>
+        <option value="dim">Dim</option>
+        <option value="black">Dark</option>
+      </select>
+    </div>
+  </div>
   <nav>
     <a href="manual/">Build a system</a>
     <a id="star-map" href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
     <a id="setting" href="https://ldjessee-code.github.io/jumpgate_starroute/docs/lore/#crowded/overview">Turquenish</a>
     <a id="notes" href="https://github.com/ldjessee-code/orbit_match">Notes</a>
-    <label class="theme-pick">Color
-      <select id="color-theme" aria-label="Color">
-        <option value="light">Light</option>
-        <option value="dim">Dim</option>
-        <option value="black">Dark</option>
-      </select>
-    </label>
   </nav>
 </header>
 <main>
@@ -42,5 +47,6 @@
   <p class="foot-right">v2.0 · GM / author tool</p>
 </footer>
 <script src="js/site.js"></script>
+<script src="js/help.js"></script>
 </body>
 </html>

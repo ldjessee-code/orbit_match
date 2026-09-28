@@ -9,19 +9,24 @@
 <script src="../js/theme.js"></script>
 </head>
 <body>
-<header>
-  <strong>Orbit Match</strong>
-  <nav>
-    <a href="../">Home</a>
-    <a id="star-map" href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
-    <a href="https://github.com/ldjessee-code/orbit_match/blob/main/INTERCONNECT.md">Interconnect</a>
-    <label class="theme-pick">Color
-      <select id="color-theme" aria-label="Color">
+<header class="site-head">
+  <div class="head-row">
+    <strong>Orbit Match</strong>
+    <div class="head-tools">
+      <a class="help-docs" href="../help/">Help</a>
+      <span class="scheme-label">Color scheme</span>
+      <button type="button" id="help-mode" class="help-mode-btn" aria-label="Context help">?</button>
+      <select id="color-theme" aria-label="Color scheme">
         <option value="light">Light</option>
         <option value="dim">Dim</option>
         <option value="black">Dark</option>
       </select>
-    </label>
+    </div>
+  </div>
+  <nav>
+    <a href="../">Home</a>
+    <a id="star-map" href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
+    <a href="https://github.com/ldjessee-code/orbit_match/blob/main/INTERCONNECT.md">Interconnect</a>
   </nav>
 </header>
 <main>
@@ -91,7 +96,7 @@
           <input data-header="services" placeholder="fuel, repair, trade">
         </label>
       </div>
-      <p class="note" id="zone-note"></p>
+      <p class="note" id="zone-note" data-help="goldilocks"></p>
       <div class="actions">
         <button type="button" id="add-body">Add an orbital object</button>
         <button type="button" id="save-system">Save this system</button>
@@ -113,5 +118,6 @@
 </footer>
 <script src="orbit.js"></script>
 <script src="manual.js"></script>
+<script src="../js/help.js"></script>
 </body>
 </html>

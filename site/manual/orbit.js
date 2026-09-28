@@ -105,6 +105,59 @@
     return "#8fd0a8";
   }
 
+  function convertPeriod(value, fromUnit, toUnit) {
+    var n = num(value);
+    if (n == null || !fromUnit || fromUnit === toUnit) return value == null ? "" : String(value);
+    var years = fromUnit === "days" ? n / YEAR_DAYS : n;
+    var out = toUnit === "days" ? years * YEAR_DAYS : years;
+    if (!Number.isFinite(out)) return "";
+    return String(Number(out.toPrecision(8)));
+  }
+
+  function airAdvice(pressureAtm, o2Percent, co2Percent) {
+    var P = num(pressureAtm);
+    if (P == null || P < 0) return null;
+    var o2 = num(o2Percent);
+    var co2 = num(co2Percent);
+    if (o2 == null) o2 = 0;
+    if (co2 == null) co2 = 0;
+    var fO2 = o2 / 100;
+    var fCO2 = co2 / 100;
+    var fN2 = Math.max(0, 1 - fO2 - fCO2);
+    var pO2 = fO2 * P;
+    var pCO2 = fCO2 * P;
+    var pN2 = fN2 * P;
+    var percent = Math.max(0, Math.round((pO2 / 0.2095) * 100));
+    var lines = [];
+    var aid = "Unaided";
+
+    if (P < 0.062) {
+      return {
+        percent: 0,
+        aid: "Pressure suit",
+        lines: ["The air is too thin to keep body fluids from boiling. A mask cannot hold a person together at that pressure. A pressure suit or a space suit is the gear that works."]
+      };
+    }
+    if (pCO2 >= 0.05) lines.push("Carbon dioxide at this pressure would overcome a person in minutes.");
+    else if (pCO2 >= 0.01) lines.push("Carbon dioxide at this pressure is poisonous. The oxygen percent does not cancel that.");
+    if (pO2 >= 1.4) lines.push("Oxygen at this pressure would injure the lungs and the nerves.");
+    else if (pO2 >= 0.5) lines.push("Oxygen at this pressure is too rich for a long stay.");
+    if (pN2 >= 3.2) lines.push("Nitrogen at this pressure would fog thinking.");
+    if (pO2 < 0.1) lines.push("Oxygen is too scarce to stay conscious.");
+    else if (pO2 < 0.16) lines.push("Oxygen is short of a normal breath. A normal breath is about 0.21 atmospheres of oxygen.");
+
+    if (P < 0.2 || (pO2 < 0.16 && P < 0.35)) aid = "Pressure suit";
+    else if (P > 5 || (P > 3 && (pN2 >= 3.2 || pO2 >= 0.5))) aid = "High-pressure support suit";
+    else if (pCO2 >= 0.01 || pO2 >= 0.5 || pN2 >= 3.2) aid = P <= 2 ? "Light environmental suit" : "Supplied air";
+    else if (pO2 < 0.16) aid = "Oxygen mask";
+    else if (P > 2) aid = "Supplied air";
+
+    if (aid === "Unaided" && pO2 >= 0.16 && pO2 <= 0.5 && pCO2 < 0.005 && P >= 0.5 && P <= 1.5) {
+      lines.unshift("People can breathe this unaided.");
+    }
+    return { percent: percent, aid: aid, lines: lines };
+  }
+
   function periodYears(body) {
     var p = num(body && body.period);
     if (p == null || p <= 0) return null;
@@ -221,6 +274,8 @@
     luminosity: luminosity,
     goldilocks: goldilocks,
     starColor: starColor,
+    convertPeriod: convertPeriod,
+    airAdvice: airAdvice,
     periodYears: periodYears,
     periodToAu: periodToAu,
     auToPeriodYears: auToPeriodYears,

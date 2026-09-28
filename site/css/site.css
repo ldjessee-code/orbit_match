@@ -81,6 +81,43 @@ header, footer {
   background: var(--bg-header);
 }
 
+header.site-head {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+.head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.head-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-left: auto;
+}
+.help-docs, .help-mode-btn {
+  font: inherit;
+  color: var(--ink);
+  background: var(--button);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  text-decoration: none;
+}
+.help-docs { padding: 0.2rem 0.55rem; }
+.help-mode-btn {
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border-radius: 999px;
+  cursor: help;
+  font-weight: 700;
+}
+.help-mode-btn.is-active { background: var(--accent); color: var(--bg); }
+header.site-head nav { width: 100%; }
+
 footer.site-foot {
   position: fixed;
   left: 0;
@@ -147,12 +184,14 @@ nav a:hover { text-decoration: underline; }
 
 .theme-pick {
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
   gap: 0.35rem;
   color: var(--muted);
   font-size: 0.85rem;
 }
-.theme-pick select {
+.scheme-label { color: var(--muted); font-size: 0.85rem; }
+#color-theme, .theme-pick select {
   font: inherit;
   color: var(--ink);
   background: var(--field);
@@ -170,5 +209,21 @@ main {
 h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 0.75rem; color: var(--ink); }
 
 .lede { font-size: 1.15rem; }
+
+.term-pop {
+  position: fixed;
+  z-index: 40;
+  max-width: 22rem;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.term-pop h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+.term-pop p { margin: 0; }
+.term-pop.hidden { display: none; }
+body.help-inspect [data-help] { outline: 2px dashed var(--accent); outline-offset: 2px; cursor: help; }
 
 

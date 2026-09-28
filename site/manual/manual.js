@@ -62,8 +62,19 @@
       government: "",
       tech: "",
       concept: "",
+      pressure: "",
+      o2: "",
+      co2: "",
+      moons: [],
       generated: !!generated
     };
+  }
+
+  function blankMoon() {
+    var moon = blankBody("moon", false);
+    moon.unit = "days";
+    moon.distanceKm = "";
+    return moon;
   }
 
   function bodies() {
@@ -135,8 +146,8 @@
       field("Name", '<input data-field="name" value="' + esc(body.name) + '">') +
       field("Kind", '<select data-field="kind">' + options(body.kind) + "</select>") +
       '<div class="pair">' +
-        field("Orbital period", '<input data-field="period" inputmode="decimal" value="' + esc(body.period) + '">') +
-        field("Unit", '<select data-field="unit"><option value="years"' + (body.unit === "years" ? " selected" : "") + '>Years</option><option value="days"' + (body.unit === "days" ? " selected" : "") + ">Days</option></select>") +
+        field("Orbital period", '<input data-field="period" data-help="period" inputmode="decimal" value="' + esc(body.period) + '">') +
+        field("Unit", '<select data-field="unit" data-help="unit"><option value="years"' + (body.unit === "years" ? " selected" : "") + '>Years</option><option value="days"' + (body.unit === "days" ? " selected" : "") + ">Days</option></select>") +
       "</div>" +
       field("Distance (AU)", '<input data-field="au" inputmode="decimal" value="' + esc(body.au) + '">') +
       (notes.length ? '<p class="warn">' + notes.map(esc).join(" ") + "</p>" : "") +
@@ -150,8 +161,53 @@
         field("Government", '<input data-field="government" value="' + esc(body.government) + '">') +
         field("Tech", '<input data-field="tech" value="' + esc(body.tech) + '">') +
         field("High concept", '<textarea data-field="concept">' + esc(body.concept) + "</textarea>") +
-      "</details>";
+        field("Surface pressure (atm)", '<input data-field="pressure" data-help="pressure" inputmode="decimal" value="' + esc(body.pressure) + '">') +
+        field("Oxygen (%)", '<input data-field="o2" data-help="o2" inputmode="decimal" value="' + esc(body.o2) + '">') +
+        field("Carbon dioxide (%)", '<input data-field="co2" data-help="co2" inputmode="decimal" value="' + esc(body.co2) + '">') +
+        airHtml(body) +
+      "</details>" +
+      moonHtml(body);
     return card;
+  }
+
+  function airHtml(body) {
+    var advice = O.airAdvice(body.pressure, body.o2, body.co2);
+    if (!advice) return "";
+    var extra = advice.lines.length ? " " + advice.lines.join(" ") : "";
+    return '<p class="air-note">Oxygen is about ' + advice.percent + '% of a normal breath. Lightest gear: ' + esc(advice.aid) + "." + esc(extra) + "</p>";
+  }
+
+  function moonHtml(body) {
+    if (body.kind === "moon") return "";
+    var moons = body.moons || [];
+    var html = '<div class="moons"><p class="moon-title">Moons</p>';
+    moons.forEach(function (moon) {
+      html += '<div class="moon" data-moon="' + esc(moon.id) + '">' +
+        '<div class="card-tools"><button type="button" data-act="remove-moon">Remove moon</button></div>' +
+        field("Moon name", '<input data-moon-field="name" value="' + esc(moon.name) + '">') +
+        '<div class="pair">' +
+          field("Period around the planet", '<input data-moon-field="period" data-help="moon-period" inputmode="decimal" value="' + esc(moon.period) + '">') +
+          field("Unit", '<select data-moon-field="unit"><option value="days"' + (moon.unit !== "years" ? " selected" : "") + '>Days</option><option value="years"' + (moon.unit === "years" ? " selected" : "") + ">Years</option></select>") +
+        "</div>" +
+        field("Distance from planet (km)", '<input data-moon-field="distanceKm" data-help="moon-distance" inputmode="decimal" value="' + esc(moon.distanceKm) + '">') +
+        "<details><summary>Moon facts</summary>" +
+          field("Gravity", '<input data-moon-field="gravity" value="' + esc(moon.gravity) + '">') +
+          field("Atmosphere", '<input data-moon-field="atmosphere" value="' + esc(moon.atmosphere) + '">') +
+          field("Surface pressure (atm)", '<input data-moon-field="pressure" inputmode="decimal" value="' + esc(moon.pressure) + '">') +
+          field("Oxygen (%)", '<input data-moon-field="o2" inputmode="decimal" value="' + esc(moon.o2) + '">') +
+          field("Carbon dioxide (%)", '<input data-moon-field="co2" inputmode="decimal" value="' + esc(moon.co2) + '">') +
+          field("Water", '<input data-moon-field="water" value="' + esc(moon.water) + '">') +
+          field("Temperature", '<input data-moon-field="temperature" value="' + esc(moon.temperature) + '">') +
+          field("Day length", '<input data-moon-field="day" value="' + esc(moon.day) + '">') +
+          field("Population", '<input data-moon-field="population" value="' + esc(moon.population) + '">') +
+          field("Government", '<input data-moon-field="government" value="' + esc(moon.government) + '">') +
+          field("Tech", '<input data-moon-field="tech" value="' + esc(moon.tech) + '">') +
+          field("High concept", '<textarea data-moon-field="concept">' + esc(moon.concept) + "</textarea>") +
+          airHtml(moon) +
+        "</details></div>";
+    });
+    html += '<button type="button" data-act="add-moon">Add a moon</button></div>';
+    return html;
   }
 
   function options(kind) {
@@ -393,7 +449,7 @@
   }
 
   function syncOrbit(body, source) {
-    if (source === "period" || source === "unit") {
+    if (source === "period") {
       var au = O.periodToAu(O.periodYears(body), mass());
       body.au = au == null ? "" : String(Math.round(au * 1000) / 1000);
     } else if (source === "au") {
@@ -405,15 +461,45 @@
   }
 
   function onStackInput(event) {
-    var input = event.target.closest("[data-field]");
+    var input = event.target.closest("[data-field], [data-moon-field]");
     var card = event.target.closest("[data-body]");
     if (!input || !card) return;
     var body = bodies().find(function (item) { return item.id === card.dataset.body; });
     if (!body) return;
+    var moonEl = input.closest("[data-moon]");
+    if (moonEl) {
+      var moon = (body.moons || []).find(function (item) { return item.id === moonEl.dataset.moon; });
+      if (!moon) return;
+      if (input.dataset.moonField === "unit") {
+        moon.period = O.convertPeriod(moon.period, moon.unit, input.value);
+        moon.unit = input.value;
+        renderStack({ body: body.id, field: "period" });
+        saveLocal();
+        return;
+      }
+      moon[input.dataset.moonField] = input.value;
+      if (input.dataset.moonField === "pressure" || input.dataset.moonField === "o2" || input.dataset.moonField === "co2") {
+        renderStack({ body: body.id, field: input.dataset.moonField });
+      }
+      saveLocal();
+      return;
+    }
+    if (input.dataset.field === "unit") {
+      body.period = O.convertPeriod(body.period, body.unit, input.value);
+      body.unit = input.value;
+      renderStack({ body: body.id, field: "period" });
+      saveLocal();
+      return;
+    }
     body[input.dataset.field] = input.value;
     if (input.dataset.field === "generated") return;
     body.generated = false;
-    if (input.dataset.field === "period" || input.dataset.field === "unit" || input.dataset.field === "au") {
+    if (input.dataset.field === "pressure" || input.dataset.field === "o2" || input.dataset.field === "co2") {
+      renderStack({ body: body.id, field: input.dataset.field });
+      saveLocal();
+      return;
+    }
+    if (input.dataset.field === "period" || input.dataset.field === "au") {
       syncOrbit(body, input.dataset.field);
       refreshHz();
       rebuildZones({
@@ -471,6 +557,22 @@
     }
     if (act.dataset.act === "in") shiftBody(id, -1);
     if (act.dataset.act === "out") shiftBody(id, 1);
+    if (act.dataset.act === "add-moon") {
+      var host = bodies().find(function (item) { return item.id === id; });
+      if (!host) return;
+      if (!host.moons) host.moons = [];
+      host.moons.push(blankMoon());
+      renderStack();
+      saveLocal();
+    }
+    if (act.dataset.act === "remove-moon") {
+      var owner = bodies().find(function (item) { return item.id === id; });
+      var moonBox = act.closest("[data-moon]");
+      if (!owner || !moonBox) return;
+      owner.moons = (owner.moons || []).filter(function (moon) { return moon.id !== moonBox.dataset.moon; });
+      renderStack();
+      saveLocal();
+    }
   }
 
   function addBody() {
@@ -551,6 +653,10 @@
     search.value = state.header.hostname;
     var list = (data.bodies || []).map(function (body) {
       body.id = body.id || uid();
+      body.moons = (body.moons || []).map(function (moon) {
+        moon.id = moon.id || uid();
+        return moon;
+      });
       return body;
     });
     refreshHz();

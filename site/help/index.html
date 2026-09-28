@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Help · Orbit Match</title>
+<link rel="stylesheet" href="../css/site.css">
+<script src="../js/theme.js"></script>
+</head>
+<body>
+<header class="site-head">
+  <div class="head-row">
+    <strong>Orbit Match</strong>
+    <div class="head-tools">
+      <a class="help-docs" href="../help/" aria-current="page">Help</a>
+      <span class="scheme-label">Color scheme</span>
+      <button type="button" id="help-mode" class="help-mode-btn" aria-label="Context help">?</button>
+      <select id="color-theme" aria-label="Color scheme">
+        <option value="light">Light</option>
+        <option value="dim">Dim</option>
+        <option value="black">Dark</option>
+      </select>
+    </div>
+  </div>
+  <nav>
+    <a href="../">Home</a>
+    <a href="../manual/">Build a system</a>
+    <a href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
+  </nav>
+</header>
+<main>
+  <h1>Help</h1>
+  <p>The <strong>?</strong> button in the header turns on context help. Click a marked control and a short note opens beside it. Press Esc to stop.</p>
+
+  <h2>Years and days</h2>
+  <p>The unit on an orbital period only changes the writing. One year is 365.25 days. Switching years to days multiplies the number. Switching back divides it. The distance in AU stays where it was, so the goldilocks band does not jump.</p>
+
+  <h2>Goldilocks zone</h2>
+  <p>The band is drawn from the star's luminosity. For a star like the Sun the edges are about 0.95 AU and 1.67 AU. A dimmer star pulls both edges inward by the square root of its light. A body is drawn inside the band when its distance from the star falls between those edges.</p>
+
+  <h2>Moons</h2>
+  <p>A moon is added on its planet, not as another column in the system row. Its period is the time to go around that planet. Its distance is kilometers from the planet. Neither number is a year around the star, and neither moves the planet into or out of the goldilocks band.</p>
+
+  <h2>Air a person can breathe</h2>
+  <p>Enter surface pressure in atmospheres (1 is Earth's air at sea level), oxygen as a percent, and carbon dioxide as a percent. The note under those fields is an estimate for an unprotected human.</p>
+  <p>A normal breath is about 0.21 atmospheres of oxygen. The percent in the note is this world's oxygen pressure divided by that normal breath. One hundred percent is a normal breath. Fifty percent is half the oxygen of sea level. It is not a promise that the air is safe. Carbon dioxide, too much oxygen, or thick nitrogen can make a high score still unfit.</p>
+  <ul>
+    <li><strong>Unaided.</strong> Pressure about 0.5 to 1.5 atmospheres, oxygen pressure about 0.16 to 0.5 atmospheres, and carbon dioxide pressure under about 0.005 atmospheres.</li>
+    <li><strong>Oxygen mask.</strong> The air is thick enough to hold a person, and the only shortage is oxygen. A mask adds oxygen. It does not remove a poisonous gas, and it does not hold pressure.</li>
+    <li><strong>Supplied air.</strong> Scuba-like gear with its own mix, breathed at the outside pressure. It answers a bad mix: too much carbon dioxide, too much oxygen, or thick nitrogen. It does not help in air so thin that fluids boil, and it is a poor answer to very high pressure.</li>
+    <li><strong>Light environmental suit.</strong> A sealed suit with its own air, for a poisonous mix when the outside pressure is still near one atmosphere.</li>
+    <li><strong>Pressure suit.</strong> The air is under about 0.2 atmospheres, or under about 0.062 atmospheres, where body fluids boil. A mask cannot do that job.</li>
+    <li><strong>High-pressure support suit.</strong> The outside air is several atmospheres thick. Breathing it, even with a better mix, brings nitrogen narcosis or oxygen injury. The suit holds an inside pressure nearer a normal breath.</li>
+  </ul>
+  <p>These are planning marks for a referee, not a medical rule.</p>
+</main>
+<footer class="site-foot">
+  <div class="foot-left">
+    <a class="tej-brand" href="https://trueeyedjack.com/" target="_blank" rel="noopener noreferrer">
+      <img src="../img/true-eyed-jack.svg" alt="" width="36" height="36">
+      <span>A <span class="tej-name">True Eyed Jack</span> app: Local First. Always Intelligent.</span>
+    </a>
+    <a href="https://github.com/ldjessee-code/orbit_match/blob/main/LICENSE">MIT License</a>
+  </div>
+  <p class="foot-mid">Turquenish setting, characters, and fiction © Lloyd Douglass Jessee 2025–2026</p>
+  <p class="foot-right">v2.0 · GM / author tool</p>
+</footer>
+<script src="../js/help.js"></script>
+</body>
+</html>

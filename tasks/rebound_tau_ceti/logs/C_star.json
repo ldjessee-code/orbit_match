@@ -1,0 +1,155 @@
+{
+  "run_id": "C_star",
+  "builder": "moons",
+  "integrator": {
+    "integrator": "ias15",
+    "dt": null,
+    "Pmin": null,
+    "epsilon": 1e-09
+  },
+  "target_yr": 2000.0,
+  "check_interval_yr": 0.1,
+  "archive_interval_yr": 50.0,
+  "t_yr": 4.241654399592401,
+  "wall_s": 0.049457999994046986,
+  "energy0": -6.889294555243865e-05,
+  "energy_last": -6.889294555243866e-05,
+  "relE_last": 1.967186487294718e-16,
+  "relE_max": 1.3770305411063026e-15,
+  "stop_reason": "radial",
+  "stop_detail": "shudder distance from kakakiko is 4.863738e-03 AU, outside [0.5, 2] x a0=1.680147e-03",
+  "seed": 20260930,
+  "megno": false,
+  "meta_brief": {
+    "kind": "moons",
+    "bodies": [
+      "kakakiko",
+      "shudder",
+      "der"
+    ],
+    "primary": {
+      "kakakiko": "star",
+      "shudder": "kakakiko",
+      "der": "kakakiko"
+    },
+    "a0": {
+      "kakakiko": 0.71,
+      "shudder": 0.0016801470588235295,
+      "der": 0.00267379679144385
+    },
+    "m": {
+      "kakakiko": 3.1397833169238855e-06,
+      "shudder": 7.498665586310289e-09,
+      "der": 3.1397833169238854e-08
+    },
+    "mstar": 0.78,
+    "pairs": [
+      [
+        "shudder",
+        "der"
+      ]
+    ],
+    "phase": "resonant",
+    "inc_deg": 0.0,
+    "a_shudder_input": 0.0016801470588235295,
+    "tuned": false,
+    "variant": null,
+    "sable_e": null,
+    "n_test_particles": 0,
+    "host": null
+  },
+  "anomalies": {
+    "gane": 2.6224027369909906,
+    "hornstooth": 2.3033788486965343,
+    "husk": 1.9038550775708805,
+    "sable": 2.071272860663441,
+    "kakakiko": 0.988091647577549,
+    "croquet": 2.4344222723571805,
+    "cue": 4.348265325561368,
+    "eight": 4.696889067384577
+  },
+  "running_minsep": {
+    "der_over_hill_max": 0.3946467525020652,
+    "sep_sh_der": 0.0010864642946472535,
+    "minsep_shudder_der": 0.0003271107047449763,
+    "inst_shudder_der": 0.0010864642946472535
+  },
+  "tp_stats": {},
+  "chunks": [
+    {
+      "t0": 0.0,
+      "t1": 4.241654399592401,
+      "wall_s": 0.049457999994046986,
+      "reason": "radial"
+    }
+  ],
+  "header": [
+    "t",
+    "E",
+    "relE",
+    "a_kakakiko",
+    "e_kakakiko",
+    "i_kakakiko",
+    "a_shudder",
+    "e_shudder",
+    "i_shudder",
+    "a_der",
+    "e_der",
+    "i_der",
+    "phi1",
+    "phi2",
+    "sep_sh_der",
+    "r_sh",
+    "r_der",
+    "hill_kak",
+    "minsep_shudder_der"
+  ],
+  "t0_elements": {
+    "kakakiko": {
+      "a": 0.7099999999999996,
+      "e": 0.03959999999999974,
+      "inc": 0.0,
+      "Omega": 0.0,
+      "omega": 0.0,
+      "M": 0.9880916475775576,
+      "n": 9.275392971102674,
+      "P": 0.6774036773163942,
+      "l": 0.9880916475775576,
+      "pomega": 0.0,
+      "f": 1.0560190216194725,
+      "rhill": 0.007831043242002808
+    },
+    "shudder": {
+      "a": 0.0016801470588235455,
+      "e": 0.2000000000000044,
+      "inc": 0.0,
+      "Omega": 0.0,
+      "omega": 0.0,
+      "M": 0.0,
+      "n": 161.85217868593818,
+      "P": 0.0388205173275525,
+      "l": 0.0,
+      "pomega": 0.0,
+      "f": 0.0,
+      "rhill": 0.0001557166244194582
+    },
+    "der": {
+      "a": 0.0026737967914437955,
+      "e": 0.029999999999990357,
+      "inc": 0.0,
+      "Omega": 0.0,
+      "omega": 0.0,
+      "M": 0.0,
+      "n": 80.9262833065632,
+      "P": 0.07764084856557367,
+      "l": 0.0,
+      "pomega": 0.0,
+      "f": 0.0,
+      "rhill": 0.00039941218775018473
+    }
+  },
+  "t0_phi": {
+    "phi1": 0.0,
+    "phi2": 0.0
+  }
+}

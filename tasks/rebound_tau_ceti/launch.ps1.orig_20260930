@@ -1,0 +1,17 @@
+# Launch the unattended REBOUND Tau Ceti run (Grok Build, headless).
+# Run from PowerShell:  powershell -ExecutionPolicy Bypass -File C:\Users\DougJ\Documents\GitHub\orbit_match\tasks\rebound_tau_ceti\launch.ps1
+$repo = 'C:\Users\DougJ\Documents\GitHub\orbit_match'
+Set-Location $repo
+
+# Optional one-time pre-install (recommended, so the run starts ready; the brief's Step 0 does it too if missing)
+# python -m pip install --user rebound matplotlib
+
+grok --cwd $repo --prompt-file 'tasks\rebound_tau_ceti.md' --permission-mode dontAsk `
+  --allow 'Bash(python *)' `
+  --allow 'Read(F:/Dropbox/Projects/Turquenish/systems/tauCet/**)' `
+  --allow 'Write(tasks/rebound_tau_ceti/**)' --allow 'Edit(tasks/rebound_tau_ceti/**)' `
+  --allow 'Write(F:/Dropbox/Projects/Turquenish/review/Tau_Cet_rebound_stability_*.md)' `
+  --allow WebFetch --allow web_fetch --allow WebSearch --allow web_search `
+  --deny 'Edit(F:/Dropbox/Projects/Turquenish/**)' `
+  --deny 'Bash(git add*)' --deny 'Bash(git commit*)' --deny 'Bash(git push*)' `
+  --max-turns 120 2>&1 | Tee-Object 'tasks\rebound_tau_ceti\run.log'

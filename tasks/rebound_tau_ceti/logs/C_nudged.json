@@ -1,0 +1,204 @@
+{
+  "run_id": "C_nudged",
+  "builder": "moons",
+  "integrator": {
+    "integrator": "ias15",
+    "dt": null,
+    "Pmin": null,
+    "epsilon": 1e-09
+  },
+  "target_yr": 10000.0,
+  "check_interval_yr": 0.1,
+  "archive_interval_yr": 100.0,
+  "t_yr": 4.730254575803859,
+  "wall_s": 0.0864022999885492,
+  "energy0": -0.0018098109626666912,
+  "energy_last": -0.0018098109626666912,
+  "relE_last": 0.0,
+  "relE_max": 7.18883150683078e-16,
+  "stop_reason": "radial",
+  "stop_detail": "shudder distance from kakakiko is 6.037386e-04 AU, outside [0.5, 2] x a0=1.680144e-03",
+  "seed": 20260930,
+  "megno": false,
+  "meta_brief": {
+    "kind": "moons",
+    "bodies": [
+      "sable",
+      "kakakiko",
+      "shudder",
+      "der",
+      "croquet"
+    ],
+    "primary": {
+      "sable": "star",
+      "kakakiko": "star",
+      "shudder": "kakakiko",
+      "der": "kakakiko",
+      "croquet": "star"
+    },
+    "a0": {
+      "sable": 0.538,
+      "kakakiko": 0.71,
+      "shudder": 0.0016801443741786977,
+      "der": 0.00267379679144385,
+      "croquet": 2.8
+    },
+    "m": {
+      "sable": 6.006979326820262e-06,
+      "kakakiko": 3.1397833169238855e-06,
+      "shudder": 7.498665586310289e-09,
+      "der": 3.1397833169238854e-08,
+      "croquet": 0.0002853315180239624
+    },
+    "mstar": 0.78,
+    "pairs": [
+      [
+        "shudder",
+        "der"
+      ],
+      [
+        "sable",
+        "kakakiko"
+      ]
+    ],
+    "phase": "resonant",
+    "inc_deg": 0.0,
+    "a_shudder_input": 0.0016801443741786977,
+    "tuned": true,
+    "variant": null,
+    "sable_e": null,
+    "n_test_particles": 0,
+    "host": null
+  },
+  "anomalies": {
+    "gane": 2.6224027369909906,
+    "hornstooth": 2.3033788486965343,
+    "husk": 1.9038550775708805,
+    "sable": 2.071272860663441,
+    "kakakiko": 0.988091647577549,
+    "croquet": 2.4344222723571805,
+    "cue": 4.348265325561368,
+    "eight": 4.696889067384577
+  },
+  "running_minsep": {
+    "der_over_hill_max": 0.3908657281220521,
+    "sep_sh_der": 0.0012494673883575724,
+    "minsep_shudder_der": 0.00023727370338081445,
+    "minsep_sable_kakakiko": 0.17623180691403972,
+    "inst_shudder_der": 0.0012945251113783112,
+    "inst_sable_kakakiko": 0.20241813671675737
+  },
+  "tp_stats": {},
+  "chunks": [
+    {
+      "t0": 0.0,
+      "t1": 4.730254575803859,
+      "wall_s": 0.0864022999885492,
+      "reason": "radial"
+    }
+  ],
+  "header": [
+    "t",
+    "E",
+    "relE",
+    "a_sable",
+    "e_sable",
+    "i_sable",
+    "a_kakakiko",
+    "e_kakakiko",
+    "i_kakakiko",
+    "a_shudder",
+    "e_shudder",
+    "i_shudder",
+    "a_der",
+    "e_der",
+    "i_der",
+    "a_croquet",
+    "e_croquet",
+    "i_croquet",
+    "phi1",
+    "phi2",
+    "sep_sh_der",
+    "r_sh",
+    "r_der",
+    "hill_kak",
+    "minsep_shudder_der",
+    "minsep_sable_kakakiko"
+  ],
+  "t0_elements": {
+    "sable": {
+      "a": 0.538,
+      "e": 1.24145562321972e-16,
+      "inc": 0.0,
+      "Omega": 0.0,
+      "omega": 2.0712728606634414,
+      "M": 0.0,
+      "n": 14.062004294771459,
+      "P": 0.44682003898376016,
+      "l": 2.0712728606634414,
+      "pomega": 2.0712728606634414,
+      "f": 0.0,
+      "rhill": 0.007366519943605118
+    },
+    "kakakiko": {
+      "a": 0.7099999999999996,
+      "e": 0.03959999999999974,
+      "inc": 0.0,
+      "Omega": 0.0,
+      "omega": 0.0,
+      "M": 0.9880916475775576,
+      "n": 9.275392971102674,
+      "P": 0.6774036773163942,
+      "l": 0.9880916475775576,
+      "pomega": 0.0,
+      "f": 1.0560190216194725,
+      "rhill": 0.007831043242002808
+    },
+    "shudder": {
+      "a": 0.0016801443741786268,
+      "e": 0.19999999999998017,
+      "inc": 0.0,
+      "Omega": 0.0,
+      "omega": 0.0,
+      "M": 0.0,
+      "n": 161.85256661313895,
+      "P": 0.03882042428278383,
+      "l": 0.0,
+      "pomega": 0.0,
+      "f": 0.0,
+      "rhill": 0.00015571637560561638
+    },
+    "der": {
+      "a": 0.0026737967914437955,
+      "e": 0.029999999999990357,
+      "inc": 0.0,
+      "Omega": 0.0,
+      "omega": 0.0,
+      "M": 0.0,
+      "n": 80.9262833065632,
+      "P": 0.07764084856557367,
+      "l": 0.0,
+      "pomega": 0.0,
+      "f": 0.0,
+      "rhill": 0.00039941218775018473
+    },
+    "croquet": {
+      "a": 2.8000000000000003,
+      "e": 1.614698600533846e-16,
+      "inc": 0.0,
+      "Omega": 0.0,
+      "omega": 2.43442227235718,
+      "M": 0.0,
+      "n": 1.1845716659993086,
+      "P": 5.30418334958153,
+      "l": 2.43442227235718,
+      "pomega": 2.43442227235718,
+      "f": 0.0,
+      "rhill": 0.13884683820329313
+    }
+  },
+  "t0_phi": {
+    "phi1": 0.0,
+    "phi2": 0.0
+  }
+}

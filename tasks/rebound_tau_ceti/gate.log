@@ -1,0 +1,3 @@
+[2026-09-30T07:01:01] stop fired reason=end_turn stopHookActive=False
+[2026-09-30T07:01:01] ALLOW stop: report complete (34429 chars)
+[2026-09-30T07:01:06] stop fired reason=shutdown stopHookActive=False

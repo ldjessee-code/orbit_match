@@ -32,7 +32,7 @@ When `test\` has Node tests, also run `node --test test/` (Node built-ins only).
 
 ## Git
 
-Bots never commit or push. Doug commits. Do not run git writes: `add`, `commit`, `push`, `checkout`, `switch`, `reset`, `restore`, `stash`, `clean`, `rm`, `mv`, `merge`, `rebase`, `pull`, `fetch`, `tag`, `config`, `apply`, `cherry-pick`, `worktree`, `init`, `remote`, or `branch -`. Read-only git (`status`, `diff`, `log`, `show`) is fine. Do not write under `.git\`.
+Bots and Grok Build commit and push only to `review`. Before committing, check `git branch --show-current` is `review`. Make small commits, one per section or change, with a conventional message. Never commit or push to `main` or `master`. Never merge, rebase, force-push, or delete branches. Doug merges and may cherry-pick. Read-only git (`status`, `diff`, `log`, `show`) is fine. Do not write under `.git\`.
 
 ## Job folders
 

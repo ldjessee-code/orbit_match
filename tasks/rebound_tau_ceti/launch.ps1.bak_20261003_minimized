@@ -3,9 +3,9 @@ param([switch]$Continue, [string]$PromptFile)
 # Job owner: LadyT (Turquenish bot), approved by Doug. Rewritten by notLloyd 2026-09-30 (LadyT's original:
 # launch.ps1.orig_20260930 next to this file).
 # Open in a visible PowerShell 7 window (what notLloyd runs):
-#   Start-Process pwsh -WindowStyle Minimized -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','C:\Users\DougJ\Documents\GitHub\orbit_match\tasks\rebound_tau_ceti\launch.ps1'
+#   Start-Process pwsh -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','C:\Users\DougJ\Documents\GitHub\orbit_match\tasks\rebound_tau_ceti\launch.ps1'
 # Continuation after an early stop (same session, new instruction file in this folder):
-#   Start-Process pwsh -WindowStyle Minimized -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','C:\Users\DougJ\Documents\GitHub\orbit_match\tasks\rebound_tau_ceti\launch.ps1','-Continue','-PromptFile','C:\Users\DougJ\Documents\GitHub\orbit_match\tasks\rebound_tau_ceti\continue1_20260930.md'
+#   Start-Process pwsh -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','C:\Users\DougJ\Documents\GitHub\orbit_match\tasks\rebound_tau_ceti\launch.ps1','-Continue','-PromptFile','C:\Users\DougJ\Documents\GitHub\orbit_match\tasks\rebound_tau_ceti\continue1_20260930.md'
 #
 # Pattern copied from F:\Dropbox\TheCourt\research-grok\patreon-member-attach-fix\launch.ps1 and indie-ios-deep-dive\launch.ps1:
 #  * --always-approve + --deny rules, NOT --permission-mode dontAsk (a dontAsk decline silently ends a headless

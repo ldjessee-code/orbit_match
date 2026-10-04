@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tau Ceti — Mardat system viewer (prototype)</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; margin: 0; background: #2c2e33; color: #f1f2f4;
+    font-family: Consolas, "Cascadia Mono", "Segoe UI", monospace; }
+  #shell { height: 100%; box-sizing: border-box; display: flex; flex-direction: column;
+    background: #6B6F76; border: 8px solid #3e4147; outline: 2px solid #C0142B; outline-offset: -12px; }
+  header { display: flex; justify-content: space-between; gap: 12px; align-items: center;
+    padding: 8px 16px 6px; font-size: 12px; letter-spacing: 1.4px; }
+  @media (max-width: 720px) {
+    header { flex-wrap: wrap; letter-spacing: .3px; font-size: 11px; }
+    #status { flex: 1 0 100%; }
+  }
+  header b { font-weight: 700; }
+  #lamps { display: flex; gap: 6px; }
+  #lamps i { width: 8px; height: 8px; background: #C0142B; display: block; box-shadow: 0 0 6px #ff3b52; }
+  #stage { position: relative; flex: 1; min-height: 0; margin: 0 14px; background: #0b0a24;
+    border: 2px solid #C0142B; box-shadow: inset 0 0 0 3px #0A0C10; touch-action: none; }
+  #view { width: 100%; height: 100%; display: block; cursor: grab; }
+  #view text { font-family: Consolas, "Cascadia Mono", monospace; }
+  #view.orbiting { cursor: crosshair; }
+  #card { position: absolute; top: 18px; right: 18px; width: min(360px, 46vw); display: none;
+    background: #6B6F76; border: 2px solid #C0142B; box-shadow: 0 6px 16px rgba(0,0,0,.45); z-index: 3; }
+  #card.open { display: block; }
+  #card .bar { background: #173f96; border-top: 2px solid #6f9be8; color: #f1f2f4;
+    font-weight: 700; letter-spacing: 1.2px; font-size: 13px; padding: 6px 10px 6px 14px;
+    box-shadow: inset 6px 0 0 #C0142B; }
+  #card .body { margin: 6px; background: #0A0C10; padding: 8px 10px 4px; font-size: 12.5px; line-height: 1.45; }
+  #card .body p { margin: 0 0 3px; }
+  #card .actions { display: flex; justify-content: space-between; align-items: center;
+    margin: 0 6px 6px; padding: 6px 8px 2px; border-top: 1px solid #3a3e46; background: #0A0C10; }
+  button.link, button.iconbtn { background: none; border: 0; color: #9ecbff; font: inherit;
+    cursor: pointer; padding: 2px 0; }
+  button.link { text-decoration: underline; }
+  button.iconbtn { display: flex; gap: 6px; align-items: center; color: #d5d8de; }
+  #dock { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+    padding: 8px 18px 10px; font-size: 11px; letter-spacing: .6px; }
+  #dock .group { display: flex; align-items: center; gap: 8px; }
+  input[type=range] { accent-color: #C0142B; }
+  #crumbs b { color: #fff; }
+  .chip { background: #0A0C10; color: #d4f0ff; padding: 2px 6px; font-size: 10px; letter-spacing: .8px; }
+  #hint { opacity: .8; }
+  #modal { position: fixed; inset: 0; background: rgba(6,6,16,.62); display: none;
+    align-items: center; justify-content: center; z-index: 5; }
+  #modal.open { display: flex; }
+  #dialog { width: min(460px, 92vw); background: #6B6F76; border: 2px solid #C0142B; }
+  #dialog h2 { margin: 0; background: #173f96; border-top: 2px solid #6f9be8; color: #fff;
+    font-size: 14px; letter-spacing: 1px; padding: 8px 12px; box-shadow: inset 6px 0 0 #C0142B; }
+  #dialog .pad { margin: 8px; background: #0A0C10; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+  #dialog .warn { color: #ff8d98; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 90px; margin-top: 8px;
+    background: #14161c; color: #f1f2f4; border: 1px solid #3e4147; font: inherit; padding: 6px; }
+  #dialog .row { display: flex; justify-content: flex-end; gap: 8px; padding: 0 8px 8px; }
+  #dialog .row button { background: #173f96; color: #fff; border: 1px solid #6f9be8; font: inherit;
+    padding: 4px 10px; cursor: pointer; }
+  #check { position: absolute; left: -999px; }
+</style>
+</head>
+<body>
+<div id="shell">
+  <header>
+    <span><b id="title">TAU CETI · SYSTEM NAV HOLO</b></span>
+    <span id="lamps" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span id="status">INTERFACE: MARDAT-STYLE · PROTOTYPE · BG #17143E</span>
+  </header>
+  <div id="stage">
+    <svg id="view" viewBox="0 0 1600 1000" role="img" aria-label="Tau Ceti system, Mardat display">
+      <defs>
+        <radialGradient id="space" cx="50%" cy="55%" r="72%">
+          <stop offset="0" stop-color="#221c52"/><stop offset=".55" stop-color="#17143e"/><stop offset="1" stop-color="#0b0a24"/>
+        </radialGradient>
+        <radialGradient id="star" cx="46%" cy="44%" r="58%">
+          <stop offset="0" stop-color="#fff1c4"/><stop offset=".45" stop-color="#ffcf6e"/>
+          <stop offset=".82" stop-color="#f7a53c"/><stop offset="1" stop-color="#e2842a"/>
+        </radialGradient>
+        <radialGradient id="halo">
+          <stop offset=".55" stop-color="#ffc45a" stop-opacity=".55"/>
+          <stop offset="1" stop-color="#ffb347" stop-opacity="0"/>
+        </radialGradient>
+        <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+          <rect width="4" height="1" fill="#d4f0ff" opacity=".04"/>
+        </pattern>
+      </defs>
+      <rect width="1600" height="1000" fill="url(#space)"/>
+      <g id="stars"></g>
+      <g id="dyn"></g>
+      <g id="hud"></g>
+      <rect width="1600" height="1000" fill="url(#scan)" pointer-events="none"/>
+    </svg>
+    <aside id="card" aria-live="polite">
+      <div class="bar" id="card-title"></div>
+      <div class="body" id="card-body"></div>
+      <div class="actions">
+        <button type="button" class="link" id="lore">Open lore</button>
+        <button type="button" class="iconbtn" id="pencil" title="Edit these details">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M2 11 L8 5 L10 7 L4 13 Z M8 5 L10.2 2.8 L12.2 4.8 L10 7 M2 11 L1 13 L4 12" fill="none" stroke="#9ecbff" stroke-width="1.2"/>
+          </svg>
+          edit
+        </button>
+      </div>
+    </aside>
+  </div>
+  <div id="dock">
+    <div class="group" id="crumbs"><b id="crumb">TAU CETI / system</b></div>
+    <div class="group"><span class="chip">ORBITS</span><span class="chip">TRANSFERS</span><span class="chip">LABELS</span><span class="chip">BELTS</span></div>
+    <div class="group">
+      <label for="zoom">ZOOM</label>
+      <input id="zoom" type="range" min="5" max="100" value="18">
+      <span id="slice">SYSTEM</span>
+    </div>
+    <div class="group">
+      <label for="elev">ELEV</label>
+      <input id="elev" type="range" min="15" max="75" value="20">
+      <span id="elev-read">20°</span>
+    </div>
+    <div class="group">
+      <label for="time">T+</label>
+      <input id="time" type="range" min="0" max="400" value="0" step="0.5">
+      <span id="time-read">0 d</span>
+      <button type="button" class="iconbtn" id="play">play</button>
+    </div>
+    <span id="hint">drag pans · right-drag or twist orbits · wheel or pinch zooms · double-click frames</span>
+  </div>
+</div>
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+  <div id="dialog">
+    <h2 id="dlg-title"></h2>
+    <div class="pad" id="dlg-body"></div>
+    <div class="row"><button type="button" id="dlg-close">Close</button></div>
+  </div>
+</div>
+<div id="check"></div>
+<script>
+const TAU = Math.PI * 2;
+const STAR_MASS = 0.78;
+const DEG = Math.PI / 180;
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function kepler(M, e) {
+  M = ((M % TAU) + TAU) % TAU;
+  let E = e < 0.8 ? M : Math.PI;
+  for (let i = 0; i < 50; i++) {
+    const d = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+    E -= d;
+    if (Math.abs(d) < 1e-12) break;
+  }
+  return E;
+}
+const P0 = { gane: 40, horn: 150, husk: 260, sable: 330, kak: 95, gg: 55, ig1: 230, ig2: 120 };
+const BODIES = {
+  gane: { name: "Gane", des: "tC 1", a: 0.133, e: 0, col: "#c48962" },
+  horn: { name: "Hornstooth", des: "tC 2", a: 0.243, e: 0, col: "#c4b090" },
+  husk: { name: "Husk", des: "tC 3", a: 0.34, e: 0, col: "#b3a48f" },
+  sable: { name: "Sable", des: "tC 4", a: 0.538, e: 0.1, col: "#6c6874" },
+  kak: { name: "Kakakiko", des: "tC 5", a: 0.71, e: 0, col: "#3d8ec4" },
+  gg: { name: "Croquet Ball", des: "tC 6 · name proposed", a: 2.8, e: 0, col: "#e0c48a", stripes: true },
+  ig1: { name: "Cue Ball", des: "tC 7 · ice giant", a: 5.5, e: 0, col: "#e7f2fb", rings: true },
+  ig2: { name: "tC 8", des: "ice giant · dusty · name TBD", a: 9.2, e: 0, col: "#3d3630" }
+};
+for (const [id, b] of Object.entries(BODIES)) {
+  b.id = id;
+  b.P = 365.25 * Math.sqrt(b.a ** 3 / STAR_MASS);
+  b.M0 = P0[id] * DEG;
+}
+function helio(b, t) {
+  const E = kepler(b.M0 + TAU * t / b.P, b.e);
+  return [b.a * (Math.cos(E) - b.e), b.a * Math.sqrt(1 - b.e * b.e) * Math.sin(E)];
+}
+const DER = { a: 400000, e: 0.03, w: 0, M0: Math.PI, P: 28.36, col: "#8d8a84" };
+const SHU = { a: 251350, e: 0.20, w: 30 * DEG, P: 14.18, col: "#d9d0c4" };
+SHU.M0 = (2 * (DER.w + DER.M0) - SHU.w) - SHU.w;
+function kpos(o, t) {
+  const E = kepler(o.M0 + TAU * t / o.P, o.e);
+  const x = o.a * (Math.cos(E) - o.e), y = o.a * Math.sqrt(1 - o.e * o.e) * Math.sin(E);
+  const c = Math.cos(o.w), s = Math.sin(o.w);
+  return [x * c - y * s, x * s + y * c];
+}
+function lag(which, t) {
+  const p = kpos(DER, t), r = Math.hypot(p[0], p[1]);
+  const th = Math.atan2(p[1], p[0]) + { l4: TAU / 6, l5: -TAU / 6, l3: Math.PI }[which];
+  return [r * Math.cos(th), r * Math.sin(th)];
+}
+function shipXY(t) {
+  const u = 0.42 + 0.45 * (((t % 20) + 20) % 20) / 20;
+  const r = 170000 + u * 190000;
+  const a = 2.15 + u * 1.15;
+  return [r * Math.cos(a), r * Math.sin(a)];
+}
+
+const knots = [0.133, 0.243, 0.34, 0.538, 0.71, 1.1, 1.6, 2.8, 5.5, 9.2, 10, 50];
+const FIT = 430, R_IN = 220, lam = 0.45;
+const la = Math.log(knots[0]), lb = Math.log(knots[knots.length - 1]);
+const u = knots.map((a, i) => ((i / (knots.length - 1)) + lam * (Math.log(a) - la) / (lb - la)) / (1 + lam));
+const rho = u.map(x => R_IN + (FIT - R_IN) * x);
+function mapR(r) {
+  if (r <= knots[0]) return R_IN * (r / knots[0]) ** 0.5 + (rho[0] - R_IN) * (r / knots[0]);
+  for (let i = 1; i < knots.length; i++) if (r <= knots[i]) {
+    const t = (Math.log(r) - Math.log(knots[i - 1])) / (Math.log(knots[i]) - Math.log(knots[i - 1]));
+    return rho[i - 1] + t * (rho[i] - rho[i - 1]);
+  }
+  return rho[rho.length - 1];
+}
+function layoutAU(xy) {
+  const r = Math.hypot(xy[0], xy[1]);
+  if (r < 1e-9) return [0, 0];
+  const k = mapR(r) / r;
+  return [xy[0] * k, xy[1] * k];
+}
+
+const LOCAL = new Set(["kak", "shu", "der", "l3", "l4", "l5", "ship", "stream"]);
+const FACTS = {
+  star: ["0.78 M☉ · 0.488 L☉ · 5,320 K · metal-poor", "Display: Mardat fiery star style (stylised).", "Warmer and more saturated than true G8V. Not red.", "Habitable zone 0.68–1.22 AU (green band)."],
+  kak: ["Ocean super-Earth · 0.967 G · 34 h day", "Orbit 0.71 AU · year 247.4 d", "Moons: Shudder, Der Eindringling", "L3 / L4 / L5 stations on Der's orbit"],
+  gg: ["Name proposed, not locked.", "Striped giant. Hohmann arrival from Kakakiko.", "481 d, Δv 8.2 + 5.7 km/s. Next window T+181 d.", "Fusion 0.01 g: 82 d, Δv 133 of 150 km/s."],
+  shu: ["Moon I · 2.8 g/cm³ · e 0.20", "Perigee 201,080 km · apogee 301,620 km", "2:1 with Der Eindringling (design spec)."],
+  der: ["Moon II · 7.2 g/cm³ · about 400,000 km", "Mass-driver stream runs from here to L4.", "Design spec: some Der mining runs Mardat hardware."],
+  l4: ["L4 yard and Goliath Funnel.", "Leads Der by 60°.", "Catches the mass-driver slugs."],
+  l5: ["L5 Haven. Cylinder-cluster icon on the mockups.", "Trails Der by 60°.", "The crew shuttle's planned arrival."],
+  l3: ["Der's L3 point, opposite Der · ~400,000 km", "Weather and monitoring of the far hemisphere.", "Crew ~20 (under 50) · 2 weeks on / 2 off.", "Relays to Der via L4 and L5."],
+  ship: ["Turquenish Empire fusion 0.01 g · coasting", "Orbit raise: Kakakiko low orbit → L5 Haven", "Snapshot at T+6 d, not live: elapsed 113.4 h, arrive in 44.1 h.", "Δv 5.4 km/s of 9.0 budget (placeholder). Reaction mass ~28% (placeholder)."],
+  stream: ["Backward shots, ~70 m/s beyond escape.", "One-orbit phasing ellipse · 23.5 d to the catcher.", "40 slugs in flight (1 per 0.6 d, placeholder)."],
+  gane: ["tC 1. No further facts in this prototype."],
+  horn: ["tC 2. No further facts in this prototype."],
+  husk: ["tC 3. No further facts in this prototype."],
+  sable: ["tC 4. No further facts in this prototype."],
+  ig1: ["tC 7, Cue Ball, ringed ice giant.", "No further facts in this prototype."],
+  ig2: ["tC 8. Name TBD. Dark, dusty ice giant.", "No further facts in this prototype."]
+};
+const TITLES = {
+  star: "TAU CETI · G8V", kak: "KAKAKIKO · tC 5", gg: "CROQUET BALL · tC 6",
+  shu: "SHUDDER · MOON I", der: "DER EINDRINGLING · MOON II",
+  l4: "L4 YARD + GOLIATH FUNNEL", l5: "L5 HAVEN", l3: "L3 WATCH STATION",
+  ship: "SHIP · CREW SHUTTLE (placeholder)", stream: "MASS-DRIVER STREAM · DER → L4",
+  gane: "GANE · tC 1", horn: "HORNSTOOTH · tC 2", husk: "HUSK · tC 3",
+  sable: "SABLE · tC 4", ig1: "CUE BALL · tC 7", ig2: "tC 8 · NAME TBD"
+};
+
+const cam = { frame: "system", tx: 0, ty: 0, zoom: 0.18, elev: 20, az: 0, t: 0, follow: null, selected: null };
+const hits = [];
+const svg = document.getElementById("view");
+const CX = 800, CY = 530;
+
+function viewScale() {
+  if (cam.frame === "system") return Math.pow(10, (cam.zoom - 0.18) / 0.62);
+  const base = 300 / 400000;
+  return base * Math.pow(7, (cam.zoom - 0.66) / 0.42);
+}
+function project(x, y) {
+  const c = Math.cos(cam.az), s = Math.sin(cam.az);
+  const dx = x - cam.tx, dy = y - cam.ty;
+  const xr = dx * c - dy * s, yr = dx * s + dy * c;
+  const k = viewScale();
+  return [CX + xr * k, CY - yr * k * Math.sin(cam.elev * DEG)];
+}
+function screenToWorld(sx, sy) {
+  const k = viewScale(), es = Math.sin(cam.elev * DEG);
+  const xr = (sx - CX) / k, yr = -(sy - CY) / (k * es);
+  const c = Math.cos(cam.az), s = Math.sin(cam.az);
+  return [cam.tx + xr * c + yr * s, cam.ty + -xr * s + yr * c];
+}
+function worldOf(id) {
+  const t = cam.t;
+  if (cam.frame === "local") {
+    if (id === "kak") return [0, 0];
+    if (id === "shu") return kpos(SHU, t);
+    if (id === "der") return kpos(DER, t);
+    if (id === "l3" || id === "l4" || id === "l5") return lag(id, t);
+    if (id === "ship") return shipXY(t);
+    if (id === "stream") {
+      const d = kpos(DER, t), L = lag("l4", t);
+      return [(d[0] + L[0]) / 2, (d[1] + L[1]) / 2];
+    }
+    return null;
+  }
+  if (id === "star") return [0, 0];
+  if (!BODIES[id]) return null;
+  return layoutAU(helio(BODIES[id], t));
+}
+function isLocalId(id) { return LOCAL.has(id); }
+
+function hash(s) {
+  let h = 2166136261;
+  for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return (h >>> 0) / 4294967296;
+}
+(function stars() {
+  const g = document.getElementById("stars");
+  let s = "";
+  for (let i = 0; i < 220; i++) {
+    const m = hash("m" + i);
+    const r = (0.4 + 1.3 * m ** 3).toFixed(2);
+    const x = (hash("x" + i) * 1600).toFixed(1), y = (hash("y" + i) * 1000).toFixed(1);
+    s += `<circle cx="${x}" cy="${y}" r="${r}" fill="#eef3ff" opacity="${(0.25 + 0.6 * m).toFixed(2)}"/>`;
+  }
+  g.innerHTML = s;
+})();
+
+function syncFollow() {
+  if (!cam.follow) return;
+  const p = worldOf(cam.follow);
+  if (!p) { cam.follow = null; return; }
+  cam.tx = p[0]; cam.ty = p[1];
+}
+function sliceName() {
+  if (cam.frame === "local") return cam.zoom > 0.82 ? "YARD" : "MOON";
+  return cam.zoom < 0.30 ? "SYSTEM" : "PLANET";
+}
+function setZoom(z) {
+  z = clamp(z, 0.05, 1);
+  if (cam.frame === "system" && z >= 0.50) {
+    cam.frame = "local";
+    const keep = cam.follow && isLocalId(cam.follow) ? cam.follow : (cam.selected && isLocalId(cam.selected) ? cam.selected : "kak");
+    cam.follow = keep;
+  } else if (cam.frame === "local" && z <= 0.42) {
+    cam.frame = "system";
+    cam.follow = (cam.selected && BODIES[cam.selected]) ? cam.selected : (cam.selected === "star" ? "star" : "kak");
+  }
+  cam.zoom = z;
+}
+function bodyR(id) {
+  const k = cam.frame === "system" ? clamp(viewScale(), 0.65, 1.8) ** 0.35 : clamp(viewScale() / (300 / 400000), 0.7, 2.2) ** 0.3;
+  if (cam.frame === "local") {
+    if (id === "kak") return 62 * k;
+    if (id === "shu" || id === "der") return 16 * k;
+    return 7;
+  }
+  if (id === "star") return 78 * clamp(viewScale(), 0.7, 1.35) ** 0.2;
+  if (id === "gg") return 20 * k;
+  if (id === "ig1" || id === "ig2") return 16 * k;
+  return 11 * k;
+}
+
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+function poly(pts) { return pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" "); }
+function ellipsePath(r, n) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const a = TAU * i / n;
+    pts.push(project(r * Math.cos(a), r * Math.sin(a)));
+  }
+  return poly(pts);
+}
+function orbitPath(fn, P) {
+  const pts = [];
+  for (let i = 0; i <= 120; i++) pts.push(project(...fn(P * i / 120)));
+  return poly(pts);
+}
+
+function render() {
+  syncFollow();
+  hits.length = 0;
+  const parts = [];
+  if (cam.frame === "system") {
+    for (let r = 80; r <= FIT; r += 55) {
+      const ring = [];
+      for (let i = 0; i <= 72; i++) {
+        const a = TAU * i / 72;
+        ring.push(project(r * Math.cos(a), r * Math.sin(a)));
+      }
+      parts.push(`<path d="${poly(ring)}" fill="none" stroke="#d4f0ff" stroke-opacity=".12"/>`);
+    }
+    for (const edge of [0.68, 1.22]) {
+      const pts = [];
+      for (let i = 0; i <= 90; i++) {
+        const a = TAU * i / 90, rad = mapR(edge);
+        pts.push(project(rad * Math.cos(a), rad * Math.sin(a)));
+      }
+      parts.push(`<path d="${poly(pts)}" fill="none" stroke="#8ff0bf" stroke-opacity=".35" stroke-width="8"/>`);
+    }
+    belt("somb", 1.1, 1.6, 160, "#d8c9a3", parts);
+    belt("wall", 10, 50, 220, "#9ec3e0", parts);
+    for (const b of Object.values(BODIES)) {
+      const d = orbitPath(tt => layoutAU(helio(b, tt)), b.P);
+      parts.push(`<path d="${d}" fill="none" stroke="#d4f0ff" stroke-opacity=".16" stroke-width="4"/>`);
+      parts.push(`<path d="${d}" fill="none" stroke="#d4f0ff" stroke-opacity=".8" stroke-width="1.15"/>`);
+    }
+    drawTransfer(parts);
+    const items = Object.values(BODIES).map(b => ({ id: b.id, p: project(...layoutAU(helio(b, cam.t))) }));
+    items.sort((a, b) => a.p[1] - b.p[1]);
+    items.filter(i => i.p[1] < CY).forEach(i => drawPlanet(parts, i.id, i.p));
+    drawStar(parts, project(0, 0));
+    items.filter(i => i.p[1] >= CY).forEach(i => drawPlanet(parts, i.id, i.p));
+    const sb = project(...layoutAU([1.35 * Math.cos(2.5), 1.35 * Math.sin(2.5)]));
+    label(parts, sb[0], sb[1], "THE SOMBRERO", "B1 · belt");
+    const ow = project(...layoutAU([22 * Math.cos(1.5), 22 * Math.sin(1.5)]));
+    label(parts, ow[0], ow[1], "OUTER WALL", "B2 · belt");
+    const tag = project(...layoutAU([0.71 * Math.cos(-0.5), 0.71 * Math.sin(-0.5)]));
+    parts.push(`<rect x="${tag[0] + 8}" y="${tag[1] - 10}" width="58" height="16" fill="#6B6F76" stroke="#C0142B"/><text x="${tag[0] + 12}" y="${tag[1] + 2}" fill="#f1f2f4" font-size="10">0.71 AU</text>`);
+  } else {
+    for (let r = 80000; r <= 460000; r += 80000) {
+      const d = ellipsePath(r, 90);
+      parts.push(`<path d="${d}" fill="none" stroke="#d4f0ff" stroke-opacity="${r % 160000 ? .1 : .2}" stroke-width="1"/>`);
+    }
+    parts.push(`<path d="${orbitPath(tt => kpos(SHU, tt), SHU.P)}" fill="none" stroke="#e8dccb" stroke-width="1.3"/>`);
+    parts.push(`<path d="${orbitPath(tt => kpos(DER, tt), DER.P)}" fill="none" stroke="#c8bcb0" stroke-width="1.3"/>`);
+    const d0 = kpos(DER, cam.t), L4 = lag("l4", cam.t), L5 = lag("l5", cam.t);
+    for (let i = 0; i < 16; i++) {
+      const u = i / 15;
+      const p = project(d0[0] + (L4[0] - d0[0]) * u, d0[1] + (L4[1] - d0[1]) * u);
+      parts.push(`<rect x="${p[0] - 3}" y="${p[1] - 1.5}" width="6" height="3" fill="#fbfcfd" transform="rotate(${(cam.az * 20).toFixed(1)} ${p[0]} ${p[1]})"/>`);
+    }
+    const shipPts = [];
+    for (let i = 0; i <= 24; i++) shipPts.push(project(...shipXY(i * 20 / 24)));
+    parts.push(`<path d="${poly(shipPts)}" fill="none" stroke="#d6bbff" stroke-width="1.6" stroke-dasharray="5 4"/>`);
+    drawLocalBody(parts, "kak", [0, 0], "KAKAKIKO", "tC 5", "#1d5f92", "#86ccef");
+    drawLocalBody(parts, "shu", kpos(SHU, cam.t), "SHUDDER", "Moon I · e 0.20", "#8d8478", "#e2d8c8");
+    drawLocalBody(parts, "der", d0, "DER EINDRINGLING", "Moon II", "#34333a", "#a0958b");
+    drawIcon(parts, "l5", L5, "haven", "L5 HAVEN", "trails Der by 60°");
+    drawIcon(parts, "l4", L4, "yard", "L4 YARD", "leads Der by 60°");
+    drawIcon(parts, "l3", lag("l3", cam.t), "watch", "L3 WATCH", "opposite Der");
+    const sp = project(...worldOf("ship"));
+    parts.push(`<path d="M${sp[0] + 8} ${sp[1]} L${sp[0] - 6} ${sp[1] - 5} L${sp[0] - 3} ${sp[1]} L${sp[0] - 6} ${sp[1] + 5} Z" fill="#f4edff" stroke="#2a1d45"/>`);
+    hit(sp, 12, "ship");
+    label(parts, sp[0] + 12, sp[1] - 10, "SHUTTLE", "placeholder");
+    const mid = project(...worldOf("stream"));
+    hit(mid, 14, "stream");
+  }
+  if (cam.selected) {
+    const p = worldOf(cam.selected);
+    if (p) {
+      const s = project(...p), r = bodyR(cam.selected) + 8;
+      parts.push(`<rect x="${s[0] - r}" y="${s[1] - r}" width="${r * 2}" height="${r * 2}" fill="none" stroke="#ff2e48" stroke-width="1.6"/>`);
+    }
+  }
+  document.getElementById("dyn").innerHTML = parts.join("");
+  drawHud();
+  drawLeader();
+  const crumb = cam.frame === "local" ? "TAU CETI / KAKAKIKO" : "TAU CETI / system";
+  document.getElementById("crumb").textContent = crumb;
+  document.getElementById("title").textContent = cam.frame === "local" ? "KAKAKIKO · LOCAL NAV HOLO" : "TAU CETI · SYSTEM NAV HOLO";
+  document.getElementById("slice").textContent = sliceName();
+  document.getElementById("elev-read").textContent = Math.round(cam.elev) + "°";
+  document.getElementById("time-read").textContent = cam.t.toFixed(1) + " d";
+  document.getElementById("zoom").value = String(Math.round(cam.zoom * 100));
+  document.getElementById("elev").value = String(Math.round(cam.elev));
+  document.getElementById("status").textContent = `INTERFACE: MARDAT-STYLE · PROTOTYPE · ELEV ${Math.round(cam.elev)}° · BG #17143E`;
+}
+
+function belt(id, a1, a2, n, col, parts) {
+  for (let i = 0; i < n; i++) {
+    const r = a1 * (a2 / a1) ** hash(id + "u" + i);
+    const th = hash(id + "t" + i) * TAU;
+    const p = project(...layoutAU([r * Math.cos(th), r * Math.sin(th)]));
+    parts.push(`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${hash(id + "s" + i) > 0.92 ? 1.4 : 0.8}" fill="${col}" opacity="${(0.35 + 0.4 * hash(id + "o" + i)).toFixed(2)}"/>`);
+  }
+}
+function drawTransfer(parts) {
+  const kak = helio(BODIES.kak, cam.t);
+  const ang = Math.atan2(kak[1], kak[0]);
+  const r1 = mapR(0.71), r2 = mapR(2.8), a = (r1 + r2) / 2, e = Math.abs(r2 - r1) / (r1 + r2);
+  const pts = [];
+  for (let i = 0; i <= 70; i++) {
+    const nu = Math.PI * i / 70;
+    const r = a * (1 - e * e) / (1 + e * Math.cos(nu));
+    pts.push(project(r * Math.cos(ang + nu), r * Math.sin(ang + nu)));
+  }
+  parts.push(`<path d="${poly(pts)}" fill="none" stroke="#6dffc8" stroke-width="2" stroke-dasharray="8 6" opacity=".9"/>`);
+  parts.push(`<path d="${poly(pts.slice(0, 16))}" fill="none" stroke="#d6bbff" stroke-width="3"/>`);
+  parts.push(`<path d="${poly(pts.slice(48))}" fill="none" stroke="#d6bbff" stroke-width="3"/>`);
+}
+function label(parts, x, y, name, sub, anchor = "start") {
+  const hs = `stroke="#141b24" stroke-width="3" paint-order="stroke" stroke-linejoin="round" text-anchor="${anchor}"`;
+  parts.push(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" fill="#f2fbff" font-size="12" font-weight="700" letter-spacing="1" ${hs}>${esc(name)}</text>`);
+  if (sub) parts.push(`<text x="${x.toFixed(1)}" y="${(y + 13).toFixed(1)}" fill="#eef4f9" font-size="10" ${hs}>${esc(sub)}</text>`);
+}
+function labelOut(parts, p, r, name, sub) {
+  const origin = project(0, 0);
+  const left = p[0] < origin[0];
+  label(parts, p[0] + (left ? -(r + 8) : r + 8), p[1] - 2, name, sub, left ? "end" : "start");
+}
+function hit(p, r, id) { hits.push({ x: p[0], y: p[1], r, id }); }
+function drawStar(parts, p) {
+  const r = bodyR("star");
+  parts.push(`<circle cx="${p[0]}" cy="${p[1]}" r="${(r * 1.7).toFixed(1)}" fill="url(#halo)"/>`);
+  parts.push(`<circle cx="${p[0]}" cy="${p[1]}" r="${r.toFixed(1)}" fill="url(#star)"/>`);
+  parts.push(`<text x="${p[0]}" y="${p[1] - 2}" text-anchor="middle" fill="#fff" font-size="14" font-weight="700" stroke="#1a0d04" stroke-width="3" paint-order="stroke">TAU CETI</text>`);
+  parts.push(`<text x="${p[0]}" y="${p[1] + 14}" text-anchor="middle" fill="#fff3d6" font-size="11" stroke="#1a0d04" stroke-width="2.5" paint-order="stroke">G8V · 5,320 K</text>`);
+  hit(p, r, "star");
+}
+function drawPlanet(parts, id, p) {
+  const b = BODIES[id], r = bodyR(id);
+  if (b.rings) parts.push(`<ellipse cx="${p[0]}" cy="${p[1]}" rx="${r * 2.2}" ry="${r * 0.7}" fill="none" stroke="#dcecf8" stroke-opacity=".7"/>`);
+  parts.push(`<circle cx="${p[0]}" cy="${p[1]}" r="${r}" fill="${b.col}" stroke="#d4f0ff" stroke-width="1.2"/>`);
+  if (b.stripes) parts.push(`<path d="M${p[0] - r} ${p[1]} h${r * 2}" stroke="#a8875a" stroke-width="2"/><path d="M${p[0] - r * 0.8} ${p[1] - r * 0.35} h${r * 1.6}" stroke="#f1e3bf" stroke-width="1.4"/>`);
+  labelOut(parts, p, r, b.name.toUpperCase(), b.des);
+  hit(p, Math.max(r, 10), id);
+}
+function drawLocalBody(parts, id, xy, name, sub, c0, c1) {
+  const p = project(...xy), r = bodyR(id);
+  parts.push(`<circle cx="${p[0]}" cy="${p[1]}" r="${r}" fill="${c1}" stroke="#d4f0ff" stroke-width="1.4"/>`);
+  parts.push(`<circle cx="${p[0] - r * 0.2}" cy="${p[1] - r * 0.15}" r="${r * 0.72}" fill="${c0}" opacity=".55"/>`);
+  labelOut(parts, p, r, name, sub);
+  hit(p, Math.max(r, 10), id);
+}
+function drawIcon(parts, id, xy, kind, name, sub) {
+  const p = project(...xy);
+  if (kind === "yard") parts.push(`<g stroke="#ffcf7a" fill="none" stroke-width="1.6"><rect x="${p[0] - 9}" y="${p[1] - 5}" width="18" height="10"/><path d="M${p[0] + 10} ${p[1] - 5} L${p[0] + 24} ${p[1] - 10} L${p[0] + 24} ${p[1] + 10} L${p[0] + 10} ${p[1] + 5} Z"/></g>`);
+  else if (kind === "haven") parts.push(`<g stroke="#8fe3ff" fill="#8fe3ff" fill-opacity=".25"><rect x="${p[0] - 14}" y="${p[1] - 8}" width="22" height="5" rx="2"/><rect x="${p[0] - 10}" y="${p[1] - 1}" width="22" height="5" rx="2"/><rect x="${p[0] - 6}" y="${p[1] + 6}" width="22" height="5" rx="2"/></g>`);
+  else parts.push(`<path d="M${p[0]} ${p[1] - 8} L${p[0] + 8} ${p[1]} L${p[0]} ${p[1] + 8} L${p[0] - 8} ${p[1]} Z" fill="#b7c4dc" fill-opacity=".25" stroke="#b7c4dc"/>`);
+  label(parts, p[0] + 16, p[1] + 18, name, sub);
+  hit(p, 14, id);
+}
+function drawHud() {
+  const rows = cam.frame === "local"
+    ? [["#d6bbff", "Fusion path · dashed = planned (schematic)"], ["#fbfcfd", "Mass-driver slugs (placeholder stream)"], ["#e8dccb", "Moon orbit, linear km"]]
+    : [["#6dffc8", "Hohmann arc, schematic"], ["#d6bbff", "Fusion burns, schematic"], ["#8ff0bf", "Habitable zone 0.68–1.22 AU"]];
+  let y = 54;
+  const h = 36 + rows.length * 16 + 28;
+  let s = `<rect x="36" y="40" width="430" height="${h}" fill="#6B6F76" stroke="#C0142B" stroke-width="2"/>`;
+  s += `<rect x="38" y="42" width="426" height="20" fill="#173f96"/><rect x="38" y="42" width="6" height="20" fill="#C0142B"/>`;
+  s += `<text x="52" y="56" fill="#f1f2f4" font-size="12" font-weight="700" letter-spacing="1.2">LEGEND · ${cam.frame === "local" ? "KAKAKIKO" : "TAU CETI"}</text>`;
+  s += `<rect x="44" y="66" width="414" height="${h - 32}" fill="#0A0C10"/>`;
+  rows.forEach((row, i) => {
+    const yy = 84 + i * 16;
+    s += `<line x1="54" y1="${yy - 4}" x2="84" y2="${yy - 4}" stroke="${row[0]}" stroke-width="2"/>`;
+    s += `<text x="92" y="${yy}" fill="#f1f2f4" font-size="11">${esc(row[1])}</text>`;
+  });
+  const note = cam.frame === "local"
+    ? "Kilometres, planet-centred. Click a body for a card. Layers are shown, not toggles."
+    : "Distances are schematic. Click a body for a card. Layers are shown, not toggles.";
+  s += `<text x="52" y="${84 + rows.length * 16 + 8}" fill="#aeb3ba" font-size="10">${esc(note)}</text>`;
+  document.getElementById("hud").innerHTML = s;
+}
+function drawLeader() {
+  const card = document.getElementById("card");
+  if (!cam.selected || card.classList.contains("open") === false) return;
+  const p = worldOf(cam.selected);
+  if (!p) return;
+  const s = project(...p);
+  const rect = card.getBoundingClientRect();
+  const vb = svg.getBoundingClientRect();
+  const x = (rect.left - vb.left) / vb.width * 1600;
+  const y = (rect.top + rect.height * 0.45 - vb.top) / vb.height * 1000;
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  line.setAttribute("d", `M${x} ${y} L${(x + s[0]) / 2} ${y} L${s[0]} ${s[1]}`);
+  line.setAttribute("fill", "none");
+  line.setAttribute("stroke", "#ff2e48");
+  line.setAttribute("stroke-width", "1.6");
+  document.getElementById("dyn").appendChild(line);
+}
+
+function showCard(id) {
+  const card = document.getElementById("card");
+  if (!FACTS[id]) { card.classList.remove("open"); return; }
+  document.getElementById("card-title").textContent = TITLES[id] || id;
+  document.getElementById("card-body").innerHTML = FACTS[id].map(line => `<p>${esc(line)}</p>`).join("");
+  card.classList.add("open");
+  card.dataset.id = id;
+}
+function select(id) {
+  if (!id || !worldOf(id) && !(cam.frame === "system" && (id === "star" || BODIES[id]))) return;
+  cam.selected = id;
+  showCard(id);
+  render();
+}
+function clearSelection() {
+  cam.selected = null;
+  cam.follow = null;
+  document.getElementById("card").classList.remove("open");
+  render();
+}
+function frameBody(id) {
+  cam.selected = id;
+  cam.follow = id;
+  if (isLocalId(id)) { cam.frame = "local"; cam.zoom = id === "kak" ? 0.64 : 0.8; }
+  else { cam.frame = "system"; cam.zoom = id === "star" ? 0.16 : 0.34; }
+  showCard(id);
+  render();
+}
+
+function openLore() {
+  const id = cam.selected;
+  openDialog("Lore link", `<p>Not wired in this prototype. This would open the lore section for <b>${esc(TITLES[id] || "")}</b>, or Orbital Object Details, which is the link already printed on the Kakakiko card.</p><p>The lines on the card are the ones from the v6 mockups and design spec. The lore file stays unread and unedited.</p>`);
+}
+function openEdit() {
+  const id = cam.selected;
+  const text = (FACTS[id] || []).join("\n");
+  openDialog("Edit details", `<p class="warn">A change here can contradict the lore document Tau_Cet_system_v2.md. This prototype does not write that file, and it does not save what you type.</p><textarea id="editbox">${esc(text)}</textarea><p>Closing this box discards the text.</p>`);
+}
+function openDialog(title, html) {
+  document.getElementById("dlg-title").textContent = title;
+  document.getElementById("dlg-body").innerHTML = html;
+  document.getElementById("modal").classList.add("open");
+}
+function closeDialog() { document.getElementById("modal").classList.remove("open"); }
+
+document.getElementById("lore").addEventListener("click", openLore);
+document.getElementById("pencil").addEventListener("click", openEdit);
+document.getElementById("dlg-close").addEventListener("click", closeDialog);
+document.getElementById("modal").addEventListener("click", (e) => { if (e.target.id === "modal") closeDialog(); });
+document.getElementById("zoom").addEventListener("input", (e) => { setZoom(Number(e.target.value) / 100); render(); });
+document.getElementById("elev").addEventListener("input", (e) => { cam.elev = Number(e.target.value); render(); });
+document.getElementById("time").addEventListener("input", (e) => { cam.t = Number(e.target.value); render(); });
+let playing = false, playTimer = 0;
+document.getElementById("play").addEventListener("click", () => {
+  playing = !playing;
+  document.getElementById("play").textContent = playing ? "pause" : "play";
+  clearInterval(playTimer);
+  if (playing) playTimer = setInterval(() => {
+    cam.t = (cam.t + (cam.frame === "local" ? 0.15 : 1.5)) % 400;
+    document.getElementById("time").value = String(cam.t);
+    render();
+  }, 80);
+});
+
+function vbPoint(evt) {
+  const pt = svg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  const m = svg.getScreenCTM();
+  if (!m) return [CX, CY];
+  const q = pt.matrixTransform(m.inverse());
+  return [q.x, q.y];
+}
+function hitTest(x, y) {
+  for (let i = hits.length - 1; i >= 0; i--) {
+    const h = hits[i];
+    if ((h.x - x) ** 2 + (h.y - y) ** 2 <= (h.r + 4) ** 2) return h.id;
+  }
+  return null;
+}
+let drag = null, lastClick = { t: 0, id: null };
+svg.addEventListener("contextmenu", (e) => e.preventDefault());
+svg.addEventListener("pointerdown", (e) => {
+  svg.setPointerCapture(e.pointerId);
+  const p = vbPoint(e);
+  drag = { id: e.pointerId, x: p[0], y: p[1], moved: 0, button: e.button, pointers: 1 };
+  if (e.button === 2) svg.classList.add("orbiting");
+});
+svg.addEventListener("pointermove", (e) => {
+  if (!drag || e.pointerId !== drag.id || touches.size >= 2) return;
+  const p = vbPoint(e);
+  const dx = p[0] - drag.x, dy = p[1] - drag.y;
+  drag.moved += Math.abs(dx) + Math.abs(dy);
+  drag.x = p[0]; drag.y = p[1];
+  if (drag.button === 2 || e.shiftKey) {
+    // Orbit around the selection. If the camera is not already locked to it,
+    // shift the target so that body stays under the cursor's view of it.
+    const pivot = cam.follow ? null : cam.selected;
+    const wp = pivot ? worldOf(pivot) : null;
+    const before = wp ? project(...wp) : null;
+    cam.az += dx * 0.35 * DEG;
+    cam.elev = clamp(cam.elev - dy * 0.18, 15, 75);
+    if (before) {
+      const after = project(...worldOf(pivot));
+      const shift = screenDeltaToWorld(after[0] - before[0], after[1] - before[1]);
+      cam.tx += shift[0]; cam.ty += shift[1];
+    }
+  } else {
+    cam.follow = null;
+    const w = screenDeltaToWorld(dx, dy);
+    cam.tx -= w[0]; cam.ty -= w[1];
+  }
+  render();
+});
+function screenDeltaToWorld(dx, dy) {
+  const k = viewScale(), es = Math.sin(cam.elev * DEG);
+  const xr = dx / k, yr = -dy / (k * es);
+  const c = Math.cos(cam.az), s = Math.sin(cam.az);
+  return [xr * c + yr * s, -xr * s + yr * c];
+}
+svg.addEventListener("pointerup", (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const p = vbPoint(e);
+  const moved = drag.moved;
+  const button = drag.button;
+  drag = null;
+  svg.classList.remove("orbiting");
+  if (moved > 6 || button !== 0) return;
+  const id = hitTest(p[0], p[1]);
+  const now = performance.now();
+  if (id && lastClick.id === id && now - lastClick.t < 400) { frameBody(id); lastClick = { t: 0, id: null }; return; }
+  lastClick = { t: now, id };
+  if (id) select(id);
+  else clearSelection();
+});
+svg.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const beforeFrame = cam.frame;
+  const p = vbPoint(e);
+  const before = screenToWorld(p[0], p[1]);
+  const followed = cam.follow;
+  setZoom(cam.zoom + (e.deltaY > 0 ? -0.045 : 0.045));
+  if (!followed && cam.frame === beforeFrame) {
+    const after = screenToWorld(p[0], p[1]);
+    cam.tx += before[0] - after[0];
+    cam.ty += before[1] - after[1];
+  }
+  render();
+}, { passive: false });
+
+const touches = new Map();
+svg.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch") touches.set(e.pointerId, vbPoint(e)); });
+svg.addEventListener("pointerup", (e) => touches.delete(e.pointerId));
+svg.addEventListener("pointercancel", (e) => touches.delete(e.pointerId));
+let pinch = null;
+svg.addEventListener("pointermove", (e) => {
+  if (e.pointerType !== "touch" || !touches.has(e.pointerId)) return;
+  touches.set(e.pointerId, vbPoint(e));
+  if (touches.size !== 2) { pinch = null; return; }
+  const [a, b] = [...touches.values()];
+  const dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+  if (!pinch) { pinch = { dist, ang }; return; }
+  const dz = (dist - pinch.dist) / 280;
+  setZoom(cam.zoom + dz);
+  cam.az += ang - pinch.ang;
+  pinch = { dist, ang };
+  render();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { closeDialog(); clearSelection(); return; }
+  if (e.target.matches("input, textarea")) return;
+  const step = e.shiftKey ? 40 : 18;
+  if (e.key === "ArrowLeft") { cam.follow = null; const w = screenDeltaToWorld(-step, 0); cam.tx -= w[0]; cam.ty -= w[1]; }
+  else if (e.key === "ArrowRight") { cam.follow = null; const w = screenDeltaToWorld(step, 0); cam.tx -= w[0]; cam.ty -= w[1]; }
+  else if (e.key === "ArrowUp") { cam.follow = null; const w = screenDeltaToWorld(0, -step); cam.tx -= w[0]; cam.ty -= w[1]; }
+  else if (e.key === "ArrowDown") { cam.follow = null; const w = screenDeltaToWorld(0, step); cam.tx -= w[0]; cam.ty -= w[1]; }
+  else if (e.key === "+" || e.key === "=") setZoom(cam.zoom + 0.05);
+  else if (e.key === "-" || e.key === "_") setZoom(cam.zoom - 0.05);
+  else if (e.key === "f" && cam.selected) frameBody(cam.selected);
+  else return;
+  render();
+});
+
+function selfCheck() {
+  const saved = { ...cam };
+  const errors = [];
+  cam.frame = "system"; cam.zoom = 0.18; cam.az = 0; cam.elev = 20; cam.t = 0; cam.follow = null; cam.tx = 0; cam.ty = 0;
+  const kak = project(...worldOf("kak"));
+  const star = project(0, 0);
+  const gap = Math.hypot(kak[0] - star[0], kak[1] - star[1]);
+  if (gap < 50) errors.push("kakakiko overlaps the star at the default zoom");
+  const outer = project(...worldOf("ig2"));
+  if (Math.hypot(outer[0] - star[0], outer[1] - star[1]) <= gap) errors.push("outer planet is not outside kakakiko");
+  cam.frame = "local"; cam.zoom = 0.66; cam.tx = 0; cam.ty = 0; cam.follow = null;
+  const der = project(...worldOf("der"));
+  const dr = Math.hypot(der[0] - CX, der[1] - CY);
+  if (dr < 180 || dr > 520) errors.push("der screen radius " + dr.toFixed(0));
+  cam.frame = "system"; cam.zoom = 0.48; setZoom(0.55);
+  if (cam.frame !== "local") errors.push("zoom did not enter the kakakiko slice");
+  setZoom(0.40);
+  if (cam.frame !== "system") errors.push("zoom did not return to the system slice");
+  cam.elev = 10; cam.elev = clamp(cam.elev, 15, 75);
+  if (cam.elev !== 15) errors.push("elev clamp");
+  Object.assign(cam, saved);
+  return errors;
+}
+
+window.__viewer = {
+  clickId: select,
+  frameId: frameBody,
+  clear: clearSelection,
+  zoomBy(dz) { setZoom(cam.zoom + dz); render(); },
+  orbit(dAz, dEl) { cam.az += dAz; cam.elev = clamp(cam.elev + dEl, 15, 75); render(); },
+  state() {
+    const card = document.getElementById("card");
+    return {
+      frame: cam.frame, zoom: cam.zoom, elev: cam.elev, az: cam.az, t: cam.t,
+      follow: cam.follow, selected: cam.selected,
+      card: card.classList.contains("open") ? document.getElementById("card-title").textContent : "",
+      modal: document.getElementById("modal").classList.contains("open") ? document.getElementById("dlg-title").textContent : ""
+    };
+  },
+  lore: openLore,
+  edit: openEdit,
+  closeDialog,
+  points() {
+    const pt = svg.createSVGPoint();
+    const m = svg.getScreenCTM();
+    return hits.map(h => {
+      pt.x = h.x; pt.y = h.y;
+      const c = pt.matrixTransform(m);
+      return { id: h.id, x: c.x, y: c.y };
+    });
+  }
+};
+
+const params = new URLSearchParams(location.search);
+const problems = selfCheck();
+document.getElementById("check").textContent = problems.length ? problems.join("; ") : "self-check ok";
+if (params.get("frame") === "local") {
+  cam.frame = "local"; cam.zoom = 0.7; cam.t = 6; cam.selected = "der"; cam.follow = "der";
+  showCard("der");
+} else if (params.get("frame") === "ship") {
+  cam.frame = "local"; cam.zoom = 0.78; cam.t = 6; cam.selected = "ship"; cam.follow = "ship";
+  showCard("ship");
+}
+render();
+</script>
+</body>
+</html>

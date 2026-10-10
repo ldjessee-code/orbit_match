@@ -1,8 +1,10 @@
 # orbit-guard.ps1 - PreToolUse guard for orbit_match jobs.
 # INERT (exit 0, no stdout) unless $env:ORBIT_JOB_DIR is set by that job's launcher.
 # Armed policy: writes, edits, and patches only inside ORBIT_REPO (default the orbit_match
-# repo, never .git\) or ORBIT_JOB_DIR. Deletes are denied. Git write commands in the shell
-# are denied. A deny is JSON on stdout and exit 0, same shape as the court job guard.
+# repo, never .git\) or ORBIT_JOB_DIR. Deletes are denied. Git writes in the shell are
+# denied unless the repo branch is review, and then only add of paths inside the repo or
+# the job dir, commit -m or commit -F, and push origin review (or a bare push whose
+# upstream is origin/review). A deny is JSON on stdout and exit 0.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 if (-not $env:ORBIT_JOB_DIR -or -not $env:ORBIT_JOB_DIR.Trim()) { exit 0 }
@@ -52,6 +54,90 @@ function Add-TextPath([System.Collections.Generic.List[string]]$list, $value) {
 
 $gitWrite = '\bgit(?:\.exe)?\s+(?:-c\s+\S+\s+)*(commit|push|add|reset|checkout|switch|restore|stash|clean|rm|mv|merge|rebase|pull|fetch|tag|config|apply|cherry-pick|worktree|init|remote)\b'
 $gitBranch = '\bgit(?:\.exe)?\s+(?:-c\s+\S+\s+)*branch\s+-'
+
+function Get-RepoBranch([string]$repoPath) {
+  $head = Join-Path $repoPath '.git\HEAD'
+  if (-not (Test-Path -LiteralPath $head)) { return '' }
+  try { $line = (Get-Content -LiteralPath $head -TotalCount 1).Trim() } catch { return '' }
+  if ($line -match '^ref:\s+refs/heads/(.+)$') { return $Matches[1].Trim() }
+  return ''
+}
+function Test-UpstreamOriginReview([string]$repoPath) {
+  $cfg = Join-Path $repoPath '.git\config'
+  if (-not (Test-Path -LiteralPath $cfg)) { return $false }
+  try { $text = Get-Content -LiteralPath $cfg -Raw } catch { return $false }
+  if ($text -notmatch '(?s)\[branch "review"\](.*?)(?:\r?\n\[|\z)') { return $false }
+  $sec = $Matches[1]
+  $remote = ''
+  $merge = ''
+  if ($sec -match '(?m)^\s*remote\s*=\s*(\S+)') { $remote = $Matches[1].Trim() }
+  if ($sec -match '(?m)^\s*merge\s*=\s*(\S+)') { $merge = $Matches[1].Trim() }
+  return ($remote -eq 'origin' -and $merge -eq 'refs/heads/review')
+}
+function Get-GitArgsAfterVerb([string]$cmd, [string]$verb) {
+  $re = '(?i)\bgit(?:\.exe)?\s+(?:-c\s+\S+\s+)*' + [regex]::Escape($verb) + '\b(.*)$'
+  $m = [regex]::Match($cmd, $re)
+  if (-not $m.Success) { return $null }
+  return $m.Groups[1].Value
+}
+function Split-GitTokens([string]$rest) {
+  $list = New-Object System.Collections.Generic.List[string]
+  if ($null -eq $rest) { return $list }
+  foreach ($m in [regex]::Matches($rest, '"(?:[^"]*)"|''(?:[^'']*)''|\S+')) {
+    $t = $m.Value
+    if ($t.Length -ge 2 -and (($t.StartsWith('"') -and $t.EndsWith('"')) -or ($t.StartsWith("'") -and $t.EndsWith("'")))) {
+      $t = $t.Substring(1, $t.Length - 2)
+    }
+    $list.Add($t)
+  }
+  return $list
+}
+function Test-ReviewGitAllow([string]$cmd, [string]$cwd) {
+  if ([regex]::Matches($cmd, '(?i)\bgit(?:\.exe)?\b').Count -ne 1) { return $false }
+  if ($cmd -match '(?i)(?:^|[\s;&|(])(remove-item|ri|rm|rmdir|rd|del|erase)\s') { return $false }
+  if ((Get-RepoBranch $repo) -ne 'review') { return $false }
+  if ($cmd -match '(?i)--force\b|--force-with-lease|--delete\b|--amend\b|--no-verify\b') { return $false }
+  if ($cmd -match '(?i)\bgit(?:\.exe)?\s+(?:-c\s+\S+\s+)*(reset|checkout|switch|restore|stash|clean|rm|mv|merge|rebase|pull|fetch|tag|config|apply|cherry-pick|worktree|init|remote)\b') { return $false }
+  if ($cmd -match '(?i)\bgit(?:\.exe)?\s+(?:-c\s+\S+\s+)*branch\s+-') { return $false }
+  if ($cmd -match '(?i)\bgit(?:\.exe)?\s+(?:-c\s+\S+\s+)*commit\b') {
+    $rest = Get-GitArgsAfterVerb $cmd 'commit'
+    if ($null -eq $rest) { return $false }
+    return ($rest -match '(?i)(^|\s)(-m|--message|-F|--file)(\s|=|$)')
+  }
+  if ($cmd -match '(?i)\bgit(?:\.exe)?\s+(?:-c\s+\S+\s+)*push\b') {
+    if ($cmd -match '(?i)\b(main|master)\b') { return $false }
+    $rest = Get-GitArgsAfterVerb $cmd 'push'
+    if ($null -eq $rest) { return $false }
+    $rest = $rest.Trim()
+    if ($rest -eq '') { return (Test-UpstreamOriginReview $repo) }
+    return ($rest -match '(?i)^origin\s+review\s*$')
+  }
+  if ($cmd -match '(?i)\bgit(?:\.exe)?\s+(?:-c\s+\S+\s+)*add\b') {
+    $rest = Get-GitArgsAfterVerb $cmd 'add'
+    if ($null -eq $rest) { return $false }
+    $paths = New-Object System.Collections.Generic.List[string]
+    $whole = $false
+    foreach ($t in (Split-GitTokens $rest)) {
+      if ($t -eq '--') { continue }
+      if ($t -in @('-A', '--all', '-u', '--update', '.')) { $whole = $true; continue }
+      if ($t.StartsWith('-')) { return $false }
+      $paths.Add($t)
+    }
+    if ($whole) {
+      if ($paths.Count -gt 0) { return $false }
+      try { $fullCwd = [IO.Path]::GetFullPath($cwd) } catch { return $false }
+      return (Inside $fullCwd $repo)
+    }
+    if ($paths.Count -eq 0) { return $false }
+    foreach ($p in $paths) {
+      try { $full = Resolve-ToolPath $p $cwd } catch { return $false }
+      if ($full -match '(?i)(?:^|\\)\.git(?:\\|$)') { return $false }
+      if (-not ((Inside $full $repo) -or (Inside $full $jobDir))) { return $false }
+    }
+    return $true
+  }
+  return $false
+}
 $writeRe = '(?i)^(search_replace|edit|write|multiedit|multi_edit|create_file|write_file|str_replace|str_replace_editor|apply_patch|notebook_edit|edit_notebook|delete_file|rename_file|move_file|remove_file)$'
 
 try {
@@ -70,7 +156,14 @@ try {
     }
     $low = $cmd.ToLowerInvariant()
     if ($low -match $gitWrite -or $low -match $gitBranch) {
-      Deny "Shell command contains a git write (commit, push, add, reset, checkout, switch, restore, stash, clean, rm, mv, merge, rebase, pull, fetch, tag, config, apply, cherry-pick, worktree, init, remote, or branch -). Bots never commit or push. Doug commits. Read-only git (status, diff, log, show) is allowed."
+      if (Test-ReviewGitAllow $cmd $cwd) {
+        Log "ALLOW git on review: $cmd"
+        exit 0
+      }
+      $why = "Git write is not allowed. On branch review the guard allows git add of paths inside the repo or the job dir, git commit -m, git commit -F, and git push origin review (or a bare git push whose upstream is origin/review). Push to main or master, --force, --delete, merge, rebase, reset, checkout, and switch stay denied. Off review, every git write is denied. Read-only git (status, diff, log, show) is allowed."
+      if ($cmd -match '(?i)\bmain\b') { $why = "Push to main is denied. $why" }
+      elseif ($cmd -match '(?i)\bmaster\b') { $why = "Push to master is denied. $why" }
+      Deny $why
     }
     if ($low -match '(^|[\s;&|(])(remove-item|ri|rm|rmdir|rd|del|erase)\s') {
       Deny "Deleting files is not allowed. Leave the file and note it in the report."

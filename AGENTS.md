@@ -76,7 +76,7 @@ When armed, `orbit-guard.ps1`:
 - Allows a write, edit, or patch only when every path (including each file in a multi-file edit or patch) is inside `ORBIT_REPO` or `ORBIT_JOB_DIR`.
 - Denies any path under `.git\`.
 - Denies deletes, including delete/rename/move file tools, a patch that deletes a file, and shell `Remove-Item` / `del` / `rm`.
-- Denies git write commands in shell tools (`run_terminal_command` and the usual aliases).
+- When the repo's current branch is `review`, allows `git add` of paths inside the repo or the job dir, `git commit -m` or `git commit -F`, and `git push origin review` (or a bare `git push` whose upstream is `origin/review`). Denies push to `main` or `master`, `--force`, `--delete`, merge, rebase, reset, checkout, switch, and every other git write. Off `review`, every git write is denied. Read-only git (`status`, `diff`, `log`, `show`) stays allowed.
 - Deny shape, then exit 0: `{"decision":"deny","reason":"...","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"..."}}`.
 - Logs to `<ORBIT_JOB_DIR>\orbit-guard.log`.
 

@@ -143,7 +143,47 @@ try {
   Pass 'delete denied' ((Is-Deny $r.Out) -and $r.Code -eq 0 -and $r.Out -match '(?i)delet') "code=$($r.Code) out=$($r.Out)"
 
   $r = Invoke-Hook $guard $armed (EventJson 'run_terminal_command' @{ command = 'git commit -m x' })
-  Pass 'git commit in shell denied' ((Is-Deny $r.Out) -and $r.Code -eq 0 -and $r.Out -match '(?i)git') "code=$($r.Code) out=$($r.Out)"
+  Pass 'git commit denied off review' ((Is-Deny $r.Out) -and $r.Code -eq 0 -and $r.Out -match '(?i)git') "code=$($r.Code) out=$($r.Out)"
+
+  $reviewRepo = Join-Path $tmp 'reviewrepo'
+  New-Item -ItemType Directory -Force -Path (Join-Path $reviewRepo 'site') | Out-Null
+  & git -C $reviewRepo init -b review --quiet
+  if ($LASTEXITCODE -ne 0) { throw "git init -b review failed ($LASTEXITCODE)" }
+  $onReview = @{ ORBIT_JOB_DIR = $job; ORBIT_REPO = $reviewRepo }
+  $insideAdd = 'site\x.txt'
+
+  $r = Invoke-Hook $guard $onReview (EventJson 'run_terminal_command' @{ command = "git add $insideAdd" } $reviewRepo)
+  Pass 'git add inside repo allowed on review' ($r.Code -eq 0 -and [string]::IsNullOrWhiteSpace($r.Out)) "code=$($r.Code) out=$($r.Out)"
+
+  $r = Invoke-Hook $guard $onReview (EventJson 'run_terminal_command' @{ command = 'git add C:\Windows\orbit-add-outside.txt' } $reviewRepo)
+  Pass 'git add outside denied on review' ((Is-Deny $r.Out) -and $r.Code -eq 0) "code=$($r.Code) out=$($r.Out)"
+
+  $r = Invoke-Hook $guard $onReview (EventJson 'run_terminal_command' @{ command = 'git commit -m x' } $reviewRepo)
+  Pass 'git commit -m allowed on review' ($r.Code -eq 0 -and [string]::IsNullOrWhiteSpace($r.Out)) "code=$($r.Code) out=$($r.Out)"
+
+  $r = Invoke-Hook $guard $onReview (EventJson 'run_terminal_command' @{ command = 'git commit -F C:\Temp\orbit-msg.txt' } $reviewRepo)
+  Pass 'git commit -F allowed on review' ($r.Code -eq 0 -and [string]::IsNullOrWhiteSpace($r.Out)) "code=$($r.Code) out=$($r.Out)"
+
+  $r = Invoke-Hook $guard $onReview (EventJson 'run_terminal_command' @{ command = 'git push origin review' } $reviewRepo)
+  Pass 'git push origin review allowed' ($r.Code -eq 0 -and [string]::IsNullOrWhiteSpace($r.Out)) "code=$($r.Code) out=$($r.Out)"
+
+  $r = Invoke-Hook $guard $onReview (EventJson 'run_terminal_command' @{ command = 'git push origin main' } $reviewRepo)
+  Pass 'git push origin main denied on review' ((Is-Deny $r.Out) -and $r.Code -eq 0 -and $r.Out -match '(?i)main') "code=$($r.Code) out=$($r.Out)"
+
+  $r = Invoke-Hook $guard $onReview (EventJson 'run_terminal_command' @{ command = 'git push --force origin review' } $reviewRepo)
+  Pass 'git push --force denied on review' ((Is-Deny $r.Out) -and $r.Code -eq 0) "code=$($r.Code) out=$($r.Out)"
+
+  $r = Invoke-Hook $guard $onReview (EventJson 'run_terminal_command' @{ command = 'git push' } $reviewRepo)
+  Pass 'bare git push denied without origin/review upstream' ((Is-Deny $r.Out) -and $r.Code -eq 0) "code=$($r.Code) out=$($r.Out)"
+
+  & git -C $reviewRepo config branch.review.remote origin
+  & git -C $reviewRepo config branch.review.merge refs/heads/review
+  if ($LASTEXITCODE -ne 0) { throw "git config upstream failed ($LASTEXITCODE)" }
+  $r = Invoke-Hook $guard $onReview (EventJson 'run_terminal_command' @{ command = 'git push' } $reviewRepo)
+  Pass 'bare git push allowed when upstream is origin/review' ($r.Code -eq 0 -and [string]::IsNullOrWhiteSpace($r.Out)) "code=$($r.Code) out=$($r.Out)"
+
+  $r = Invoke-Hook $guard $onReview (EventJson 'run_terminal_command' @{ command = 'git merge main' } $reviewRepo)
+  Pass 'git merge denied on review' ((Is-Deny $r.Out) -and $r.Code -eq 0) "code=$($r.Code) out=$($r.Out)"
 
   $r = Invoke-Hook $guard $armed (EventJson 'run_terminal_command' @{ command = 'git status' })
   Pass 'git status in shell allowed' ($r.Code -eq 0 -and [string]::IsNullOrWhiteSpace($r.Out)) "code=$($r.Code) out=$($r.Out)"
@@ -176,6 +216,10 @@ try {
 
   $r = Invoke-Hook $gate @{ ORBIT_JOB_DIR = $job; ORBIT_REPO = $repoTmp; ORBIT_JOB_VERIFY = $badScript } $notEnd
   Pass 'non-end_turn ignored' ($r.Code -eq 0 -and [string]::IsNullOrWhiteSpace($r.Out) -and $r.Out -notmatch 'ORBIT_VERIFY_FAIL_MARKER') "code=$($r.Code) out=$($r.Out)"
+
+  $subStop = '{"reason":"end_turn","stopHookActive":false,"subagentType":"general"}'
+  $r = Invoke-Hook $gate @{ ORBIT_JOB_DIR = $job; ORBIT_REPO = $repoTmp; ORBIT_JOB_VERIFY = $badScript } $subStop
+  Pass 'subagent stop ignored' ($r.Code -eq 0 -and [string]::IsNullOrWhiteSpace($r.Out) -and $r.Out -notmatch 'ORBIT_VERIFY_FAIL_MARKER') "code=$($r.Code) out=$($r.Out)"
 
   $r = Invoke-Hook $gate @{ ORBIT_JOB_DIR = $job; ORBIT_REPO = $repoTmp } $endTurn
   Pass 'default verify.ps1 allows' ($r.Code -eq 0 -and [string]::IsNullOrWhiteSpace($r.Out)) "code=$($r.Code) out=$($r.Out) err=$($r.Err)"

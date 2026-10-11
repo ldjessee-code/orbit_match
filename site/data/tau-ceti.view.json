@@ -1,0 +1,21 @@
+{
+  "orbit_match_view": 1,
+  "system": "tau-ceti.system.json",
+  "elevation_deg": 20,
+  "azimuth_deg": 0,
+  "distance_mode": "schematic",
+  "legend_corner": "tl",
+  "style": "quiet",
+  "theme": "empire",
+  "callouts": [],
+  "layers": {
+    "orbits": true,
+    "labels": true,
+    "belts": true,
+    "habitable": true,
+    "transfers": true,
+    "structures": true,
+    "grid": false
+  },
+  "epoch_days": 0
+}

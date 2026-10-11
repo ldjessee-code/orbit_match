@@ -118,4 +118,4 @@ Approved 2026-10-10. Doug signed off the order 0 through 5. The builder writes v
 
 ## Phase order
 
-Approved 2026-10-10: phase 0, phase 1, phase 2, phase 3, phase 4, phase 5. Phase 0 is done on `review`. Phase 1 is next.
+Approved 2026-10-10: phase 0, phase 1, phase 2, phase 3, phase 4, phase 5. Phases 0 and 1 are done on `review`. Phase 2 is next.

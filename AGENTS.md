@@ -28,7 +28,16 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File tests\hooks.tests.ps1
 
 `tests\hooks.tests.ps1` is plain asserts (no Pester). It prints `PASS <name>` or `FAIL <name>` and exits 1 if any check fails. Hook, launcher, and `AGENTS.md` changes are not done until that command exits 0.
 
-When `test\` has Node tests, also run `node --test test/` (Node built-ins only). No installs during a job.
+When `test\` has Node tests, also run `node --test "test/**/*.js"` (Node built-ins only). No installs during a job. On Node 24, `node --test test/` tries to load the directory as a module and exits 1. The quoted glob is the command that exits 0.
+
+## Proof
+
+| Proof | Command | Done when |
+| --- | --- | --- |
+| Build | none | `site/` is the artifact. `pages.yml` still uploads `site` and nothing else |
+| Test | `pwsh -NoProfile -ExecutionPolicy Bypass -File tests\hooks.tests.ps1` and `node --test "test/**/*.js"` | both exit 0 |
+| Lint | `node --check` on each `site/**/*.js`, run by `test/lint.test.js` | exit 0. No new linter |
+| Definition of done | those commands exit 0, the branch is `review`, a behavior change started as a failing test, the SVG page still renders with WebGL unavailable | Doug merges to `main` when the public site should change |
 
 ## Git
 
@@ -84,4 +93,4 @@ When armed, `orbit-stop-gate.ps1` logs to `<ORBIT_JOB_DIR>\orbit-gate.log`. On a
 
 ## Todos
 
-Port follow-ups stay in `TODO_PORTS.md`. Do not hardcode the Jumpgate Starroute URL (`127.0.0.1:8080` in `BRIEF.md` is stale). Doug decides the port pair. The note there suggests jumpgate_starroute 8130 and orbit_match 8131, outside the gamer_eye block 8050-8119.
+Port follow-ups stay in `TODO_PORTS.md`. Do not hardcode the Jumpgate Starroute URL (`127.0.0.1:8080` in `BRIEF.md` is stale). The local Orbit Match static server is 8131. The server script arrives with the viewer. 8130 stays Jumpgate's port in the note. The page does not hardcode either port. Stay outside the gamer_eye block 8050-8119.

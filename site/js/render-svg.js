@@ -307,7 +307,7 @@ function drawChildOrbit(parts, body, place, px, ratio, cx, cy, style) {
       pts.push(place(spot.x, spot.y));
     }
     const d = polyline(pts);
-    const call = ' data-callout="orbit:' + xml(body.id) + '"';
+    const call = ' data-callout="body:' + xml(body.id) + '"';
     parts.push('<path' + call + ' d="' + d + '" fill="none" stroke="transparent" stroke-width="10"/>');
     parts.push('<path data-id="' + xml(body.id) + '" d="' + d + '" fill="none" stroke="' + style.orbit + '" stroke-width="1" pointer-events="none"/>');
     return;
@@ -355,7 +355,7 @@ function starDisk(parts, system, cx, cy, r, theme, style) {
 function ring(parts, cx, cy, rx, ratio, color, au, id) {
   const label = au == null ? '' : auText(au) + ' AU';
   const hit = au == null ? '' : ' data-au="' + auText(au) + '"';
-  const call = ' data-callout="orbit:' + xml(id) + '"';
+  const call = ' data-callout="body:' + xml(id) + '"';
   parts.push('<g><title>' + label + '</title><ellipse data-id="' + xml(id) + '"' + hit + call + ' cx="' + cx + '" cy="' + cy + '" rx="' + num(rx) + '" ry="' + num(rx * ratio) + '" fill="none" stroke="transparent" stroke-width="12"/><ellipse data-role="orbit" data-id="' + xml(id) + '" cx="' + cx + '" cy="' + cy + '" rx="' + num(rx) + '" ry="' + num(rx * ratio) + '" fill="none" stroke="' + color + '" stroke-width="1" pointer-events="none"/></g>');
 }
 
@@ -564,10 +564,20 @@ function legendRow(body, dist, theme) {
   return { id: body.id, name: body.name, dist: dist, color: fillFor(body, theme) };
 }
 
+function cardKey(id) {
+  const text = String(id);
+  if (text.slice(0, 6) === 'orbit:') return 'body:' + text.slice(6);
+  return text;
+}
+
 function drawCallouts(parts, ctx) {
-  const ids = Array.isArray(ctx.view.callouts) ? ctx.view.callouts.slice(0, 3) : [];
+  const ids = [];
+  (Array.isArray(ctx.view.callouts) ? ctx.view.callouts : []).forEach(function (id) {
+    const key = cardKey(id);
+    if (ids.indexOf(key) < 0) ids.push(key);
+  });
   const blocks = [];
-  ids.forEach(function (id) {
+  ids.slice(0, 3).forEach(function (id) {
     const block = calloutBlock(id, ctx);
     if (block) blocks.push(block);
   });
@@ -587,7 +597,6 @@ function calloutBlock(id, ctx) {
   const bodyId = split.slice(1).join(':');
   const body = byId(ctx.system, bodyId);
   if (!body) return null;
-  if (kind === 'orbit') return orbitBlock(body, ctx);
   return bodyBlock(body, ctx);
 }
 
@@ -652,40 +661,6 @@ function bodyAnchor(body, ctx) {
     return { x: at.sx, y: at.sy, r: 0 };
   }
   return { x: ctx.CX, y: ctx.CY, rx: ctx.focusR || ctx.rStar || 8, ry: ctx.focusR || ctx.rStar || 8 };
-}
-
-function orbitBlock(body, ctx) {
-  const orbit = body.orbit || {};
-  const lines = [];
-  if (typeof orbit.a_au === 'number') lines.push(auText(orbit.a_au) + ' AU');
-  if (typeof orbit.a_km === 'number') lines.push(Math.round(orbit.a_km) + ' km');
-  if (typeof orbit.a_inner_au === 'number' && typeof orbit.a_outer_au === 'number') {
-    lines.push(auText(orbit.a_inner_au) + '\u2013' + auText(orbit.a_outer_au) + ' AU');
-  }
-  return {
-    id: 'orbit:' + body.id,
-    title: body.name + ' orbit',
-    lines: lines.length ? lines : ['Orbit'],
-    color: ctx.style.orbit,
-    anchor: orbitAnchor(body, ctx)
-  };
-}
-
-function orbitAnchor(body, ctx) {
-  const orbit = body.orbit || {};
-  if (ctx.place && ctx.heliocentric && typeof orbit.a_au === 'number') {
-    const base = (ctx.angles && ctx.angles.get(body.id)) || 0;
-    const angle = base + 0.7;
-    const at = ctx.place(orbit.a_au * Math.cos(angle), orbit.a_au * Math.sin(angle));
-    return { x: at.sx, y: at.sy, r: 0 };
-  }
-  if (ctx.place && typeof orbit.a_km === 'number') {
-    const base = typeof body.angle_deg === 'number' ? (body.angle_deg * Math.PI) / 180 : 0;
-    const angle = base + 0.7;
-    const at = ctx.place(orbit.a_km * Math.cos(angle), orbit.a_km * Math.sin(angle));
-    return { x: at.sx, y: at.sy, r: 0 };
-  }
-  return { x: ctx.CX, y: ctx.CY, r: 0 };
 }
 
 function transferBlock(id, ctx) {

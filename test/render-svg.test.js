@@ -97,9 +97,12 @@ function painted(svg, id, color) {
   const raw = readJson('site/data/tau-ceti.system.json');
   const body = raw.bodies.find(function (item) { return item.id === id; });
   assert.equal(body.display.color, color, id);
-  const disk = tagWith(svg, 'data-callout', 'body:' + id);
+  const tags = svg.match(new RegExp('<[a-zA-Z0-9]+\\b[^>]*\\bdata-callout="body:' + id + '"[^>]*>', 'g')) || [];
+  const disk = tags.find(function (tag) {
+    return tag.indexOf('data-id="' + id + '"') >= 0 && tag.indexOf('fill="' + color + '"') >= 0;
+  });
+  assert.ok(disk, 'disk ' + id);
   const swatch = tagWith(svg, 'data-swatch', id);
-  assert.equal(attr(disk, 'fill'), color, 'disk ' + id);
   assert.equal(attr(swatch, 'fill'), color, 'swatch ' + id);
 }
 

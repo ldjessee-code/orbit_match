@@ -32,13 +32,24 @@ function paint() {
   document.getElementById('crumb-focus').setAttribute('aria-current', frame === 'system' ? 'false' : 'true');
 }
 
+function cardKey(id) {
+  const text = String(id);
+  if (text.slice(0, 6) === 'orbit:') return 'body:' + text.slice(6);
+  return text;
+}
+
 function toggleCallout(id) {
   if (!bag || !id) return;
-  const list = bag.view.callouts.slice();
-  const at = list.indexOf(id);
+  const key = cardKey(id);
+  const list = [];
+  bag.view.callouts.forEach(function (item) {
+    const next = cardKey(item);
+    if (list.indexOf(next) < 0) list.push(next);
+  });
+  const at = list.indexOf(key);
   if (at >= 0) list.splice(at, 1);
   else {
-    list.push(id);
+    list.push(key);
     if (list.length > 3) list.shift();
   }
   bag.view.callouts = list;

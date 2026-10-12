@@ -32,13 +32,44 @@ function paint() {
   document.getElementById('crumb-focus').setAttribute('aria-current', frame === 'system' ? 'false' : 'true');
 }
 
-document.getElementById('crumb-system').addEventListener('click', function () {
-  frame = 'system';
+function toggleCallout(id) {
+  if (!bag || !id) return;
+  const list = bag.view.callouts.slice();
+  const at = list.indexOf(id);
+  if (at >= 0) list.splice(at, 1);
+  else {
+    list.push(id);
+    if (list.length > 3) list.shift();
+  }
+  bag.view.callouts = list;
   paint();
+}
+
+sky.addEventListener('click', function (event) {
+  if (!bag) return;
+  const hit = event.target.closest ? event.target.closest('[data-callout]') : null;
+  if (hit && sky.contains(hit)) {
+    toggleCallout(hit.getAttribute('data-callout'));
+    return;
+  }
+  const role = event.target.getAttribute && event.target.getAttribute('data-role');
+  if (role === 'sky' && bag.view.callouts.length) {
+    bag.view.callouts = [];
+    paint();
+  }
+});
+
+function showFrame(next) {
+  frame = next;
+  if (bag) bag.view.callouts = [];
+  paint();
+}
+
+document.getElementById('crumb-system').addEventListener('click', function () {
+  showFrame('system');
 });
 document.getElementById('crumb-focus').addEventListener('click', function () {
-  frame = this.getAttribute('data-frame') || 'system';
-  paint();
+  showFrame(this.getAttribute('data-frame') || 'system');
 });
 
 Promise.all([

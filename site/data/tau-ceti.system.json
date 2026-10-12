@@ -117,6 +117,7 @@
     {
       "id": "tc1",
       "name": "Gane",
+      "display": { "color": "#a15a3a" },
       "designation": "tC 1",
       "kind": "planet",
       "parent": null,
@@ -128,6 +129,7 @@
     {
       "id": "tc2",
       "name": "Hornstooth",
+      "display": { "color": "#8d6b4a" },
       "designation": "tC 2",
       "kind": "planet",
       "parent": null,
@@ -139,6 +141,7 @@
     {
       "id": "tc3",
       "name": "Husk",
+      "display": { "color": "#7d7872" },
       "designation": "tC 3",
       "kind": "planet",
       "parent": null,
@@ -150,6 +153,7 @@
     {
       "id": "tc4",
       "name": "Sable",
+      "display": { "color": "#2c3036" },
       "designation": "tC 4",
       "kind": "planet",
       "parent": null,
@@ -161,6 +165,7 @@
     {
       "id": "tc5",
       "name": "Kakakiko",
+      "display": { "color": "#2f6f9a" },
       "designation": "tC 5",
       "kind": "planet",
       "parent": null,
@@ -172,6 +177,7 @@
     {
       "id": "tc5a",
       "name": "Shudder",
+      "display": { "color": "#8d8680" },
       "designation": "tC 5a",
       "kind": "moon",
       "parent": "tc5",
@@ -183,6 +189,7 @@
     {
       "id": "tc5b",
       "name": "Der Eindringling",
+      "display": { "color": "#6a5e52" },
       "designation": "tC 5b",
       "kind": "moon",
       "parent": "tc5",
@@ -194,6 +201,7 @@
     {
       "id": "haven",
       "name": "Haven",
+      "display": { "color": "#d5dde6" },
       "kind": "structure",
       "parent": "tc5",
       "orbit": { "a_km": 54076, "e": 0 },
@@ -204,6 +212,7 @@
     {
       "id": "yard",
       "name": "Yard",
+      "display": { "color": "#c6b48a" },
       "kind": "structure",
       "parent": "tc5",
       "orbit": { "a_km": 54076, "e": 0 },
@@ -214,6 +223,7 @@
     {
       "id": "watch",
       "name": "Watch station",
+      "display": { "color": "#9aa7b2" },
       "kind": "structure",
       "parent": "tc5",
       "orbit": { "a_km": 54076, "e": 0 },
@@ -224,6 +234,7 @@
     {
       "id": "b1",
       "name": "The Sombrero",
+      "display": { "color": "#c2b48a" },
       "designation": "B1",
       "kind": "belt",
       "parent": null,
@@ -234,6 +245,7 @@
     {
       "id": "tc6",
       "name": "Croquet Ball",
+      "display": { "color": "#d4bc7a", "stripes": true, "stripe": "#f4efe4" },
       "designation": "tC 6",
       "kind": "planet",
       "parent": null,
@@ -245,6 +257,7 @@
     {
       "id": "tc6gate",
       "name": "Jumpgate",
+      "display": { "color": "#c9b6f2", "shape": "torus" },
       "kind": "structure",
       "parent": null,
       "orbit": { "a_au": 2.8 },
@@ -255,6 +268,7 @@
     {
       "id": "tc7",
       "name": "Cue Ball",
+      "display": { "color": "#f3f1ea" },
       "rings": true,
       "designation": "tC 7",
       "kind": "planet",
@@ -267,6 +281,7 @@
     {
       "id": "tc8",
       "name": "Eight Ball",
+      "display": { "color": "#16181c" },
       "designation": "tC 8",
       "kind": "planet",
       "parent": null,
@@ -278,6 +293,7 @@
     {
       "id": "b2",
       "name": "Outer Wall",
+      "display": { "color": "#aeb6b0" },
       "designation": "B2",
       "kind": "belt",
       "parent": null,

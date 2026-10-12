@@ -1,33 +1,49 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" font-family="Segoe UI, system-ui, sans-serif">
 <radialGradient id="star-fill"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#ffe0a0"/></radialGradient>
-<rect width="1600" height="1000" fill="#070b10"/>
-<g><title></title><ellipse data-id="sync" cx="820" cy="530" rx="78.8" ry="26.9" fill="none" stroke="transparent" stroke-width="12"/><ellipse data-role="orbit" data-id="sync" cx="820" cy="530" rx="78.8" ry="26.9" fill="none" stroke="#d5deea" stroke-width="1"/></g>
+<rect data-role="sky" width="1600" height="1000" fill="#070b10"/>
+<g><title></title><ellipse data-id="haven" data-callout="orbit:haven" cx="820" cy="530" rx="78.8" ry="26.9" fill="none" stroke="transparent" stroke-width="12"/><ellipse data-role="orbit" data-id="haven" cx="820" cy="530" rx="78.8" ry="26.9" fill="none" stroke="#d5deea" stroke-width="1" pointer-events="none"/></g>
 <text x="906.8" y="522.0" fill="#c5ced8" font-size="12">54076 km</text>
-<path data-id="tc5a" d="M996.0 530.0 L995.3 524.0 L993.1 518.0 L989.4 512.1 L984.4 506.4 L978.1 500.9 L970.5 495.6 L961.8 490.5 L952.0 485.8 L941.2 481.3 L929.6 477.2 L917.3 473.5 L904.4 470.1 L890.9 467.1 L877.0 464.5 L862.7 462.3 L848.3 460.4 L833.6 458.9 L819.0 457.7 L804.3 456.9 L789.7 456.4 L775.2 456.3 L760.9 456.5 L746.9 456.9 L733.1 457.7 L719.7 458.7 L706.7 460.0 L694.0 461.6 L681.8 463.4 L670.0 465.4 L658.8 467.6 L648.0 470.0 L637.8 472.6 L628.1 475.4 L619.0 478.4 L610.5 481.4 L602.5 484.7 L595.2 488.0 L588.5 491.5 L582.3 495.0 L576.8 498.7 L572.0 502.4 L567.8 506.2 L564.2 510.1 L561.2 514.0 L559.0 518.0 L557.3 522.0 L556.3 526.0 L556.0 530.0 L556.3 534.0 L557.3 538.0 L559.0 542.0 L561.2 546.0 L564.2 549.9 L567.8 553.8 L572.0 557.6 L576.8 561.3 L582.3 565.0 L588.5 568.5 L595.2 572.0 L602.5 575.3 L610.5 578.6 L619.0 581.6 L628.1 584.6 L637.8 587.4 L648.0 590.0 L658.8 592.4 L670.0 594.6 L681.8 596.6 L694.0 598.4 L706.7 600.0 L719.7 601.3 L733.1 602.3 L746.9 603.1 L760.9 603.5 L775.2 603.7 L789.7 603.6 L804.3 603.1 L819.0 602.3 L833.6 601.1 L848.3 599.6 L862.7 597.7 L877.0 595.5 L890.9 592.9 L904.4 589.9 L917.3 586.5 L929.6 582.8 L941.2 578.7 L952.0 574.2 L961.8 569.5 L970.5 564.4 L978.1 559.1 L984.4 553.6 L989.4 547.9 L993.1 542.0 L995.3 536.0 L996.0 530.0" fill="none" stroke="#d5deea" stroke-width="1"/>
-<g><title></title><ellipse data-id="tc5b" cx="820" cy="530" rx="349.5" ry="119.5" fill="none" stroke="transparent" stroke-width="12"/><ellipse data-role="orbit" data-id="tc5b" cx="820" cy="530" rx="349.5" ry="119.5" fill="none" stroke="#d5deea" stroke-width="1"/></g>
+<path data-callout="orbit:tc5a" d="M996.0 530.0 L995.3 524.0 L993.1 518.0 L989.4 512.1 L984.4 506.4 L978.1 500.9 L970.5 495.6 L961.8 490.5 L952.0 485.8 L941.2 481.3 L929.6 477.2 L917.3 473.5 L904.4 470.1 L890.9 467.1 L877.0 464.5 L862.7 462.3 L848.3 460.4 L833.6 458.9 L819.0 457.7 L804.3 456.9 L789.7 456.4 L775.2 456.3 L760.9 456.5 L746.9 456.9 L733.1 457.7 L719.7 458.7 L706.7 460.0 L694.0 461.6 L681.8 463.4 L670.0 465.4 L658.8 467.6 L648.0 470.0 L637.8 472.6 L628.1 475.4 L619.0 478.4 L610.5 481.4 L602.5 484.7 L595.2 488.0 L588.5 491.5 L582.3 495.0 L576.8 498.7 L572.0 502.4 L567.8 506.2 L564.2 510.1 L561.2 514.0 L559.0 518.0 L557.3 522.0 L556.3 526.0 L556.0 530.0 L556.3 534.0 L557.3 538.0 L559.0 542.0 L561.2 546.0 L564.2 549.9 L567.8 553.8 L572.0 557.6 L576.8 561.3 L582.3 565.0 L588.5 568.5 L595.2 572.0 L602.5 575.3 L610.5 578.6 L619.0 581.6 L628.1 584.6 L637.8 587.4 L648.0 590.0 L658.8 592.4 L670.0 594.6 L681.8 596.6 L694.0 598.4 L706.7 600.0 L719.7 601.3 L733.1 602.3 L746.9 603.1 L760.9 603.5 L775.2 603.7 L789.7 603.6 L804.3 603.1 L819.0 602.3 L833.6 601.1 L848.3 599.6 L862.7 597.7 L877.0 595.5 L890.9 592.9 L904.4 589.9 L917.3 586.5 L929.6 582.8 L941.2 578.7 L952.0 574.2 L961.8 569.5 L970.5 564.4 L978.1 559.1 L984.4 553.6 L989.4 547.9 L993.1 542.0 L995.3 536.0 L996.0 530.0" fill="none" stroke="transparent" stroke-width="10"/>
+<path data-id="tc5a" d="M996.0 530.0 L995.3 524.0 L993.1 518.0 L989.4 512.1 L984.4 506.4 L978.1 500.9 L970.5 495.6 L961.8 490.5 L952.0 485.8 L941.2 481.3 L929.6 477.2 L917.3 473.5 L904.4 470.1 L890.9 467.1 L877.0 464.5 L862.7 462.3 L848.3 460.4 L833.6 458.9 L819.0 457.7 L804.3 456.9 L789.7 456.4 L775.2 456.3 L760.9 456.5 L746.9 456.9 L733.1 457.7 L719.7 458.7 L706.7 460.0 L694.0 461.6 L681.8 463.4 L670.0 465.4 L658.8 467.6 L648.0 470.0 L637.8 472.6 L628.1 475.4 L619.0 478.4 L610.5 481.4 L602.5 484.7 L595.2 488.0 L588.5 491.5 L582.3 495.0 L576.8 498.7 L572.0 502.4 L567.8 506.2 L564.2 510.1 L561.2 514.0 L559.0 518.0 L557.3 522.0 L556.3 526.0 L556.0 530.0 L556.3 534.0 L557.3 538.0 L559.0 542.0 L561.2 546.0 L564.2 549.9 L567.8 553.8 L572.0 557.6 L576.8 561.3 L582.3 565.0 L588.5 568.5 L595.2 572.0 L602.5 575.3 L610.5 578.6 L619.0 581.6 L628.1 584.6 L637.8 587.4 L648.0 590.0 L658.8 592.4 L670.0 594.6 L681.8 596.6 L694.0 598.4 L706.7 600.0 L719.7 601.3 L733.1 602.3 L746.9 603.1 L760.9 603.5 L775.2 603.7 L789.7 603.6 L804.3 603.1 L819.0 602.3 L833.6 601.1 L848.3 599.6 L862.7 597.7 L877.0 595.5 L890.9 592.9 L904.4 589.9 L917.3 586.5 L929.6 582.8 L941.2 578.7 L952.0 574.2 L961.8 569.5 L970.5 564.4 L978.1 559.1 L984.4 553.6 L989.4 547.9 L993.1 542.0 L995.3 536.0 L996.0 530.0" fill="none" stroke="#d5deea" stroke-width="1" pointer-events="none"/>
+<g><title></title><ellipse data-id="tc5b" data-callout="orbit:tc5b" cx="820" cy="530" rx="349.5" ry="119.5" fill="none" stroke="transparent" stroke-width="12"/><ellipse data-role="orbit" data-id="tc5b" cx="820" cy="530" rx="349.5" ry="119.5" fill="none" stroke="#d5deea" stroke-width="1" pointer-events="none"/></g>
 <text x="1004.0" y="546.0" fill="#f2f5f8" font-size="12">120848 km</text>
-<circle data-id="yard" cx="793.1" cy="504.7" r="5.0" fill="#8fd0ff"/>
-<circle data-id="watch" cx="748.6" cy="518.6" r="5.0" fill="#8fd0ff"/>
-<circle data-id="tc5a" cx="996.0" cy="530.0" r="6.0" fill="#d9d3c7"/>
-<circle data-id="tc5b" cx="1159.0" cy="530.0" r="6.0" fill="#d9d3c7"/>
-<circle data-id="haven" cx="898.8" cy="530.0" r="5.0" fill="#8fd0ff"/>
-<circle id="focus" cx="820" cy="530" r="18.0" fill="#9bb0c4"/>
-<text text-anchor="middle" x="820" y="568" fill="#f2f5f8" font-size="16">Kakakiko</text>
-<text data-name="yard" text-anchor="end" x="777.8" y="490.3" fill="#f2f5f8" font-size="14">Yard</text>
-<text data-name="watch" text-anchor="end" x="727.9" y="515.3" fill="#f2f5f8" font-size="14">Watch station</text>
-<text data-name="tc5a" text-anchor="start" x="1018.0" y="530.0" fill="#f2f5f8" font-size="14">Shudder</text>
-<text data-name="tc5b" text-anchor="start" x="1181.0" y="530.0" fill="#f2f5f8" font-size="14">Der Eindringling</text>
-<text data-name="haven" text-anchor="start" x="919.8" y="530.0" fill="#f2f5f8" font-size="14">Haven</text>
+<circle data-id="yard" data-callout="body:yard" cx="793.1" cy="504.7" r="5.0" fill="#c6b48a" stroke="#c5ced8" stroke-width="1"/>
+<circle data-id="watch" data-callout="body:watch" cx="748.6" cy="518.6" r="5.0" fill="#9aa7b2" stroke="#c5ced8" stroke-width="1"/>
+<circle data-id="tc5a" data-callout="body:tc5a" cx="996.0" cy="530.0" r="6.0" fill="#8d8680" stroke="#c5ced8" stroke-width="1"/>
+<circle data-id="tc5b" data-callout="body:tc5b" cx="1159.0" cy="530.0" r="6.0" fill="#6a5e52" stroke="#c5ced8" stroke-width="1"/>
+<circle data-id="haven" data-callout="body:haven" cx="898.8" cy="530.0" r="5.0" fill="#d5dde6" stroke="#c5ced8" stroke-width="1"/>
+<circle id="focus" data-callout="body:tc5" cx="820" cy="530" r="18.0" fill="#2f6f9a" stroke="#c5ced8" stroke-width="1"/>
+<text data-callout="body:tc5" text-anchor="middle" x="820" y="568" fill="#f2f5f8" font-size="16">Kakakiko</text>
+<text data-name="yard" data-callout="body:yard" text-anchor="end" x="777.8" y="490.3" fill="#f2f5f8" font-size="14">Yard</text>
+<text data-name="watch" data-callout="body:watch" text-anchor="end" x="727.9" y="515.3" fill="#f2f5f8" font-size="14">Watch station</text>
+<text data-name="tc5a" data-callout="body:tc5a" text-anchor="start" x="1018.0" y="530.0" fill="#f2f5f8" font-size="14">Shudder</text>
+<text data-name="tc5b" data-callout="body:tc5b" text-anchor="start" x="1181.0" y="530.0" fill="#f2f5f8" font-size="14">Der Eindringling</text>
+<text data-name="haven" data-callout="body:haven" text-anchor="start" x="919.8" y="530.0" fill="#f2f5f8" font-size="14">Haven</text>
 <g id="legend">
-<rect x="24" y="24" width="300" height="132" rx="8" fill="#141b24" stroke="#2c3848" stroke-width="1"/>
+<rect x="24" y="24" width="300" height="204" rx="8" fill="#141b24" stroke="#2c3848" stroke-width="1"/>
 <rect x="40" y="52" width="72" height="2" fill="#8fd0ff"/>
 <text x="40" y="46" fill="#f2f5f8" font-size="16">Legend</text>
-<text x="214" y="46" fill="#c5ced8" font-size="12">True AU</text>
-<text x="40" y="72" fill="#f2f5f8" font-size="12">Distances</text>
-<text x="214" y="72" fill="#c5ced8" font-size="12" font-family="ui-monospace, Cascadia Mono, Consolas, monospace">linear km</text>
-<text x="40" y="90" fill="#f2f5f8" font-size="12">Elevation</text>
-<text x="214" y="90" fill="#c5ced8" font-size="12" font-family="ui-monospace, Cascadia Mono, Consolas, monospace">20°</text>
-<text x="40" y="116" fill="#c5ced8" font-size="12">Linear kilometres.</text>
-<text x="40" y="132" fill="#c5ced8" font-size="12">Stations share the synchronous ring.</text>
+<text x="214" y="46" fill="#c5ced8" font-size="12">Distance</text>
+<circle data-swatch="tc5" data-callout="body:tc5" cx="46" cy="68" r="4.5" fill="#2f6f9a" stroke="#c5ced8" stroke-width="1"/>
+<text x="58" y="72" fill="#f2f5f8" font-size="12">Kakakiko</text>
+<text x="214" y="72" fill="#c5ced8" font-size="12" font-family="ui-monospace, Cascadia Mono, Consolas, monospace"></text>
+<circle data-swatch="tc5a" data-callout="body:tc5a" cx="46" cy="86" r="4.5" fill="#8d8680" stroke="#c5ced8" stroke-width="1"/>
+<text x="58" y="90" fill="#f2f5f8" font-size="12">Shudder</text>
+<text x="214" y="90" fill="#c5ced8" font-size="12" font-family="ui-monospace, Cascadia Mono, Consolas, monospace">151060 km</text>
+<circle data-swatch="tc5b" data-callout="body:tc5b" cx="46" cy="104" r="4.5" fill="#6a5e52" stroke="#c5ced8" stroke-width="1"/>
+<text x="58" y="108" fill="#f2f5f8" font-size="12">Der Eindringling</text>
+<text x="214" y="108" fill="#c5ced8" font-size="12" font-family="ui-monospace, Cascadia Mono, Consolas, monospace">240000 km</text>
+<circle data-swatch="haven" data-callout="body:haven" cx="46" cy="122" r="4.5" fill="#d5dde6" stroke="#c5ced8" stroke-width="1"/>
+<text x="58" y="126" fill="#f2f5f8" font-size="12">Haven</text>
+<text x="214" y="126" fill="#c5ced8" font-size="12" font-family="ui-monospace, Cascadia Mono, Consolas, monospace">54076 km</text>
+<circle data-swatch="yard" data-callout="body:yard" cx="46" cy="140" r="4.5" fill="#c6b48a" stroke="#c5ced8" stroke-width="1"/>
+<text x="58" y="144" fill="#f2f5f8" font-size="12">Yard</text>
+<text x="214" y="144" fill="#c5ced8" font-size="12" font-family="ui-monospace, Cascadia Mono, Consolas, monospace">54076 km</text>
+<circle data-swatch="watch" data-callout="body:watch" cx="46" cy="158" r="4.5" fill="#9aa7b2" stroke="#c5ced8" stroke-width="1"/>
+<text x="58" y="162" fill="#f2f5f8" font-size="12">Watch station</text>
+<text x="214" y="162" fill="#c5ced8" font-size="12" font-family="ui-monospace, Cascadia Mono, Consolas, monospace">54076 km</text>
+<text x="40" y="188" fill="#c5ced8" font-size="12">Linear kilometres.</text>
+<text x="40" y="204" fill="#c5ced8" font-size="12">Stations share the synchronous ring.</text>
 </g>
+<rect data-role="frame" x="0.5" y="0.5" width="1599" height="999" fill="none" stroke="#2c3848" stroke-width="1" pointer-events="none"/>
 </svg>

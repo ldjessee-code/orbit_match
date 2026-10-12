@@ -35,6 +35,14 @@ main.viewer-main {
 
 #sky {
   overflow: hidden;
+  max-width: 1600px;
+  background: #070b10;
+  border: 1px solid #2c3848;
+  border-radius: 8px;
+}
+
+#sky [data-callout] {
+  cursor: pointer;
 }
 
 #sky svg {
@@ -59,4 +67,6 @@ main.viewer-main {
   height: auto;
   margin: 0 0 1rem;
   background: #070b10;
+  border: 1px solid #2c3848;
+  border-radius: 8px;
 }

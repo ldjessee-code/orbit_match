@@ -109,6 +109,19 @@ function tagWith(svg, name, value) {
   return match[0];
 }
 
+test('an orbit ring opens the same card as its body', async function () {
+  const bag = await loaded();
+  const svg = bag.draw.renderSvg(bag.system, bag.view, bag.empire, bag.quiet);
+  assert.equal(attr(tagWith(svg, 'data-au', '9.2'), 'data-callout'), 'body:tc8');
+  assert.doesNotMatch(svg, /data-callout="orbit:/);
+  bag.view.callouts = ['body:tc8', 'orbit:tc8'];
+  const both = bag.draw.renderSvg(bag.system, bag.view, bag.empire, bag.quiet);
+  assert.equal((both.match(/class="card"/g) || []).length, 1);
+  assert.match(both, /9\.2 AU/);
+  const close = bag.draw.renderSvg(bag.system, bag.view, bag.empire, bag.quiet, { frame: 'tc5' });
+  assert.doesNotMatch(close, /data-callout="orbit:/);
+});
+
 test('a callout uses the item color and a leader', async function () {
   const bag = await loaded();
   bag.view.callouts = ['body:tc4'];

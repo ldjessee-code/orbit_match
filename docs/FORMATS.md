@@ -34,7 +34,7 @@ If `period_days` is missing and `a_au` is present, the loader derives the period
 
 `orbit_match_view` is 1. Fields: `elevation_deg` (default 20, clamped to 15–75), `azimuth_deg` (default 0, the angle around the focused body), `distance_mode` (`schematic` or `true`), `legend_corner`, `style`, `theme`, `callouts` (at most 3), `layers`, and `epoch_days`.
 
-`callouts` entries are `body:<id>`, `orbit:<id>`, `transfer:hohmann`, `transfer:fusion`, or `star`. An empty list draws no cards. The page fills the list when a disk, a ring, or a transfer is clicked.
+`callouts` entries are `body:<id>`, `transfer:hohmann`, `transfer:fusion`, or `star`. `orbit:<id>` selects the same card as `body:<id>`. An empty list draws no cards. The page fills the list when a disk, a ring, or a transfer is clicked. A ring click toggles that body's card.
 
 `style` and `theme` are strings a setting supplies. Quiet and holo are the chrome files in `site/themes/`. Empire is the palette file that ships with the Tau Ceti example. Mardat is a later file. Another setting may use its own names. The renderer reads those files. The Tau Ceti view starts at quiet Empire.
 

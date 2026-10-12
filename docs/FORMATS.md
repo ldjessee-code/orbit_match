@@ -20,6 +20,8 @@ Star luminosity may be `lum_solar` (linear) or `lum_log` (log10). The loader rec
 
 `canon` maps a field path to `locked`, `est`, `derived`, `real`, `fiction`, `narrative`, `tbd`, or `placeholder`. `source` names the setting section. The site does not read the setting's markdown.
 
+A body may set `display.color` and `display.shape`. `torus` draws a ring. The renderer uses that color for the disk, the legend swatch, and that body's callout. A missing `display` falls back to the theme. `display.stripes` draws thin bands across the disk in `display.stripe`.
+
 `lore.version` and `lore.source` name the file the fixture was copied from. `lore.copied` lists the field paths that copy must match. A node test fails when the fixture and that list disagree. A later lore edit that changes one of those fields is stale until the fixture and the test change together.
 
 If `period_days` is missing and `a_au` is present, the loader derives the period with a 365.25-day year and the same cube root as `site/manual/orbit.js`. A body with no `a_au`, `period_days`, `a_km`, or belt edges is listed in `skipped`. It is not deleted.
@@ -31,6 +33,8 @@ If `period_days` is missing and `a_au` is present, the loader derives the period
 ## View file
 
 `orbit_match_view` is 1. Fields: `elevation_deg` (default 20, clamped to 15–75), `azimuth_deg` (default 0, the angle around the focused body), `distance_mode` (`schematic` or `true`), `legend_corner`, `style`, `theme`, `callouts` (at most 3), `layers`, and `epoch_days`.
+
+`callouts` entries are `body:<id>`, `orbit:<id>`, `transfer:hohmann`, `transfer:fusion`, or `star`. An empty list draws no cards. The page fills the list when a disk, a ring, or a transfer is clicked.
 
 `style` and `theme` are strings a setting supplies. Quiet and holo are the chrome files in `site/themes/`. Empire is the palette file that ships with the Tau Ceti example. Mardat is a later file. Another setting may use its own names. The renderer reads those files. The Tau Ceti view starts at quiet Empire.
 

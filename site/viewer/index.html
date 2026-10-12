@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tau Ceti — Orbit Match</title>
+<link rel="stylesheet" href="../css/site.css">
+<link rel="stylesheet" href="viewer.css">
+<script src="../js/theme.js"></script>
+</head>
+<body>
+<header class="site-head">
+  <div class="head-row">
+    <strong>Orbit Match</strong>
+    <div class="head-tools">
+      <a class="help-docs" href="../help/">Help</a>
+      <span class="scheme-label">Color scheme</span>
+      <select id="color-theme" aria-label="Color scheme">
+        <option value="light">Light</option>
+        <option value="dim">Dim</option>
+        <option value="black">Dark</option>
+      </select>
+    </div>
+  </div>
+  <nav>
+    <a href="../">Home</a>
+    <a href="../manual/">Build a system</a>
+    <a id="star-map" href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
+    <a id="setting" href="https://ldjessee-code.github.io/jumpgate_starroute/docs/lore/#crowded/overview">Turquenish</a>
+    <a href="plates/">Chrome plates</a>
+  </nav>
+</header>
+<main class="viewer-main">
+  <div class="dock">
+    <p id="crumbs">
+      <button type="button" id="crumb-system" data-frame="system">Tau Ceti</button>
+      <span aria-hidden="true">/</span>
+      <button type="button" id="crumb-focus" data-frame="tc5">Kakakiko</button>
+    </p>
+    <label>Zoom <input id="zoom" type="range" min="1" max="8" value="1" disabled></label>
+    <label>Elevation <input id="elev" type="range" min="15" max="75" value="20" disabled> <span>20°</span></label>
+    <button type="button" id="time-play" disabled>Time ×1, paused</button>
+    <p id="readout" aria-live="polite"></p>
+  </div>
+  <p id="load-status"></p>
+  <div id="sky"></div>
+</main>
+<script type="module" src="viewer.js"></script>
+</body>
+</html>

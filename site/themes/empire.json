@@ -1,0 +1,14 @@
+{
+  "theme": "empire",
+  "accent": "#8fd0ff",
+  "planet": "#9bb0c4",
+  "moon": "#d9d3c7",
+  "structure": "#8fd0ff",
+  "belt": "#d8c9a3",
+  "star": {
+    "core": "#fffaf0",
+    "fill": "#ffe0a0",
+    "edge": "#f3c983",
+    "treatment": "soft"
+  }
+}

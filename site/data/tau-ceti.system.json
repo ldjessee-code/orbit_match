@@ -102,6 +102,7 @@
   },
   "star": {
     "hostname": "tau Cet",
+    "name": "Tau Ceti",
     "setting_name": "Turquenish",
     "spectype": "G8V",
     "mass_solar": 0.78,
@@ -254,6 +255,7 @@
     {
       "id": "tc7",
       "name": "Cue Ball",
+      "rings": true,
       "designation": "tC 7",
       "kind": "planet",
       "parent": null,

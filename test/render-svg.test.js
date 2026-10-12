@@ -64,7 +64,13 @@ test('quiet svg names Tau Ceti and skips holo filters', async function () {
   assert.match(svg, /<text\b[^>]*>Croquet Ball<\/text>/);
   assert.doesNotMatch(svg, /proposed/i);
   assert.doesNotMatch(svg, /TBD/);
-  assert.match(svg, /e ≤ 0\.1/);
+  assert.doesNotMatch(svg, /class="card"/);
+  assert.doesNotMatch(svg, /e ≤ 0\.1/);
+  assert.match(svg, /data-role="frame"/);
+  const zone = svg.match(/<ellipse\b[^>]*\bdata-role="habitable"[^>]*>/);
+  assert.ok(zone, 'habitable edge');
+  assert.equal(attr(zone[0], 'fill'), 'none');
+  assert.match(svg, />Habitable</);
   const star = elementById(svg, 'star');
   const name = elementById(svg, 'star-name');
   const gap = Math.hypot(Number(attr(name, 'x')) - Number(attr(star, 'cx')), Number(attr(name, 'y')) - Number(attr(star, 'cy')));
@@ -79,9 +85,45 @@ test('quiet svg names Tau Ceti and skips holo filters', async function () {
   });
   assert.match(svg, /0\.71 AU/);
   assert.match(svg, /2\.8 AU/);
+  painted(svg, 'tc8', '#16181c');
+  painted(svg, 'tc6', '#d4bc7a');
+  painted(svg, 'tc7', '#f3f1ea');
+  painted(svg, 'tc6gate', '#c9b6f2');
+  assert.match(svg, /data-shape="torus"/);
+  assert.equal(readJson('site/data/tau-ceti.system.json').bodies.find(function (body) { return body.id === 'tc6gate'; }).display.shape, 'torus');
+});
+
+function painted(svg, id, color) {
+  const raw = readJson('site/data/tau-ceti.system.json');
+  const body = raw.bodies.find(function (item) { return item.id === id; });
+  assert.equal(body.display.color, color, id);
+  const disk = tagWith(svg, 'data-callout', 'body:' + id);
+  const swatch = tagWith(svg, 'data-swatch', id);
+  assert.equal(attr(disk, 'fill'), color, 'disk ' + id);
+  assert.equal(attr(swatch, 'fill'), color, 'swatch ' + id);
+}
+
+function tagWith(svg, name, value) {
+  const match = svg.match(new RegExp('<[a-zA-Z0-9]+\\b[^>]*\\b' + name + '="' + value + '"[^>]*>'));
+  assert.ok(match, name + '=' + value);
+  return match[0];
+}
+
+test('a callout uses the item color and a leader', async function () {
+  const bag = await loaded();
+  bag.view.callouts = ['body:tc4'];
+  const sable = bag.draw.renderSvg(bag.system, bag.view, bag.empire, bag.quiet);
+  assert.match(sable, /e ≤ 0\.1/);
+  assert.match(sable, /data-role="leader"/);
+  const card = tagWith(sable, 'class', 'card');
+  assert.equal(attr(card, 'stroke'), '#2c3036');
+  bag.view.callouts = ['transfer:hohmann'];
+  const hop = bag.draw.renderSvg(bag.system, bag.view, bag.empire, bag.quiet);
   const kepler = await import('../site/js/kepler.js');
-  const hop = kepler.hohmannDays(0.71, 2.8, 0.78);
-  assert.match(svg, new RegExp(hop.days.toFixed(0) + ' d'));
+  const days = kepler.hohmannDays(0.71, 2.8, 0.78).days.toFixed(0);
+  assert.match(hop, new RegExp(days + ' d'));
+  assert.equal(attr(tagWith(hop, 'class', 'card'), 'stroke'), bag.quiet.hohmann);
+  assert.match(hop, /data-role="leader"/);
 });
 
 test('a theme accent is read from the theme object', async function () {

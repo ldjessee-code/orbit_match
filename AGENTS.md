@@ -93,4 +93,4 @@ When armed, `orbit-stop-gate.ps1` logs to `<ORBIT_JOB_DIR>\orbit-gate.log`. On a
 
 ## Todos
 
-Port follow-ups stay in `TODO_PORTS.md`. Do not hardcode the Jumpgate Starroute URL (`127.0.0.1:8080` in `BRIEF.md` is stale). The local Orbit Match static server is 8131. The server script arrives with the viewer. 8130 stays Jumpgate's port in the note. The page does not hardcode either port. Stay outside the gamer_eye block 8050-8119.
+Port follow-ups stay in `TODO_PORTS.md`. Do not hardcode the Jumpgate Starroute URL (`127.0.0.1:8080` in `BRIEF.md` is stale). The local Orbit Match static server is 8131. Run it with `node tools/serve-site.mjs`. 8130 stays Jumpgate's port in the note. The page does not hardcode either port. Stay outside the gamer_eye block 8050-8119.

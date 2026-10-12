@@ -2,7 +2,7 @@
 
 Added 2026-09-28. `AGENTS.md` now exists. Port follow-ups stay in this file. The `## Todos` section of `AGENTS.md` points here.
 
-Decision 2026-10-10: the local Orbit Match static server listens on 8131. The script arrives with the viewer, not in the proof-table phase. 8130 remains the Jumpgate Starroute port in this note. The page does not hardcode 8130 or 8131. The peer URL comes from the query `?jumpgate=`, then localStorage, then `site/config.json`.
+Decision 2026-10-10: the local Orbit Match static server listens on 8131. The script is `tools/serve-site.mjs` (a port argument or `ORBIT_MATCH_PORT` overrides 8131). 8130 remains the Jumpgate Starroute port in this note. The page does not hardcode 8130 or 8131. The peer URL comes from the query `?jumpgate=`, then localStorage, then `site/config.json`.
 
 ## Todos
 

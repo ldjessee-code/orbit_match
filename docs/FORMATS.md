@@ -32,7 +32,9 @@ If `period_days` is missing and `a_au` is present, the loader derives the period
 
 `orbit_match_view` is 1. Fields: `elevation_deg` (default 20, clamped to 15–75), `azimuth_deg` (default 0, the angle around the focused body), `distance_mode` (`schematic` or `true`), `legend_corner`, `style`, `theme`, `callouts` (at most 3), `layers`, and `epoch_days`.
 
-`style` and `theme` are strings a setting supplies. Quiet and holo are the chrome values that ship with the Tau Ceti example. Empire and Mardat are the theme names that ship with it. Another setting may use its own names. The Tau Ceti view starts at quiet Empire.
+`style` and `theme` are strings a setting supplies. Quiet and holo are the chrome files in `site/themes/`. Empire is the palette file that ships with the Tau Ceti example. Mardat is a later file. Another setting may use its own names. The renderer reads those files. The Tau Ceti view starts at quiet Empire.
+
+`star.name` is the label drawn beside the disc. `hostname` stays the setting's short name. A view may name one transfer with `transfer.from` and `transfer.to`. The picture asks `kepler.js` for the days and the burns. Ring angles are display spacing when the file has no mean anomaly.
 
 ## Stability file
 

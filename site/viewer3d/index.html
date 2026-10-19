@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tau Ceti — 3D — Orbit Match</title>
+<link rel="stylesheet" href="../css/site.css">
+<link rel="stylesheet" href="viewer3d.css">
+<script src="../js/theme.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<header class="site-head">
+  <div class="head-row">
+    <strong>Orbit Match</strong>
+    <div class="head-tools">
+      <a class="help-docs" href="../help/">Help</a>
+      <span class="scheme-label">Color scheme</span>
+      <select id="color-theme" aria-label="Color scheme">
+        <option value="light">Light</option>
+        <option value="dim">Dim</option>
+        <option value="black">Dark</option>
+      </select>
+    </div>
+  </div>
+  <nav>
+    <a href="../">Home</a>
+    <a href="../viewer/">SVG viewer</a>
+    <a href="./" aria-current="page">3D view</a>
+    <a href="../manual/">Build a system</a>
+    <a id="star-map" href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
+    <a id="setting" href="https://ldjessee-code.github.io/jumpgate_starroute/docs/lore/#crowded/overview">Turquenish</a>
+  </nav>
+</header>
+<main class="viewer-main">
+  <div class="dock">
+    <p id="crumbs">
+      <button type="button" id="crumb-system" data-frame="system">Tau Ceti</button>
+      <span aria-hidden="true">/</span>
+      <button type="button" id="crumb-focus" data-frame="tc5">Kakakiko</button>
+    </p>
+    <span id="zoom-note">Zoom: wheel</span>
+    <label>Elevation <input id="elev" type="range" min="15" max="75" value="20"> <span id="elev-readout">20°</span></label>
+    <button type="button" id="distance-mode">Schematic</button>
+    <label>Theme
+      <select id="scene-theme" aria-label="Scene theme">
+        <option value="empire">empire</option>
+        <option value="mardat">mardat</option>
+      </select>
+    </label>
+    <details class="belt-controls" open>
+      <summary>The Sombrero</summary>
+      <label>Density <input id="belt-b1-density" type="range" min="0" max="4" step="1" value="2" aria-label="The Sombrero Density"> <span id="belt-b1-density-readout">4200</span></label>
+      <label>Dustiness <input id="belt-b1-dustiness" type="range" min="0" max="100" step="1" value="40" aria-label="The Sombrero Dustiness"> <span id="belt-b1-dustiness-readout">40</span></label>
+    </details>
+    <details class="belt-controls" open>
+      <summary>Outer Wall</summary>
+      <label>Density <input id="belt-b2-density" type="range" min="0" max="4" step="1" value="2" aria-label="Outer Wall Density"> <span id="belt-b2-density-readout">2800</span></label>
+      <label>Dustiness <input id="belt-b2-dustiness" type="range" min="0" max="100" step="1" value="40" aria-label="Outer Wall Dustiness"> <span id="belt-b2-dustiness-readout">40</span></label>
+    </details>
+    <button type="button" id="time-play">Time ×1, paused</button>
+    <p id="readout" aria-live="polite"></p>
+  </div>
+  <p id="load-status"></p>
+  <div id="stage">
+    <canvas></canvas>
+    <div id="legend"></div>
+    <div id="labels"></div>
+    <div id="cards"></div>
+    <div id="fallback" hidden>
+      <h2>WebGL is not available</h2>
+      <p>This page needs WebGL to draw the 3D system. The SVG system view still works.</p>
+      <p><a href="../viewer/">Open the SVG system view</a></p>
+    </div>
+  </div>
+</main>
+<script type="module" src="viewer3d.js"></script>
+</body>
+</html>

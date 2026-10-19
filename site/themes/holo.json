@@ -1,0 +1,20 @@
+{
+  "style": "holo",
+  "background": "#5a6270",
+  "surface": "#141b24",
+  "border": "#c5ced8",
+  "text": "#f2f5f8",
+  "muted": "#d5deea",
+  "orbit": "#d4f0ff",
+  "hohmann": "#5fe0a8",
+  "hohmann_dash": "8 6",
+  "fusion": "#c4b5fd",
+  "warning": "#f0b429",
+  "habitable": "#9dbeab",
+  "leader": "#d4f0ff",
+  "belt": "#d8c9a3",
+  "filters": true,
+  "scan": true,
+  "lamps": true,
+  "star_radius": 72
+}

@@ -124,6 +124,7 @@ button { cursor: pointer; }
   background: var(--bg);
 }
 .empty { color: var(--muted); }
+.deep-link-target { outline: 3px solid var(--accent); outline-offset: 3px; }
 details summary { cursor: pointer; margin: 0.4rem 0; }
 
 @media (min-width: 900px) {

@@ -1,0 +1,16 @@
+{
+  "orbit_match_stability": 1,
+  "lore_version": "v2.41c",
+  "source": "F:\\Dropbox\\Projects\\Turquenish\\systems\\tauCet\\Tau_Cet_system_v2.md",
+  "moons": {
+    "drawn": {
+      "a_km": { "shudder": 151060, "der": 240000 },
+      "resonance": "2:1",
+      "verdict": "REBOUND 5.2.1 IAS15 with the star, Sable, Kakakiko, both moons, and Croquet Ball kept the 2:1 locked for the 20,000 years that were run. A second run of the same bodies lasted 1,200 years. Those lengths are the runs, not a lifetime."
+    },
+    "lagrange": "Neither moon's L4 or L5 is a station. The 2026-10-09 run lost the equilateral particles and both L3 controls inside 50 years."
+  },
+  "synchronous": "A test particle at 54,076 km was quiet for 1,000 years. v2.41c did not repeat that particle.",
+  "giants": "The older giant check is not the moon verdict.",
+  "croquet_trojans": "A v2.40 REBOUND run of 100,000 years kept test particles at Croquet Ball's L4 and L5 on tadpole orbits. The jumpgate may sit at L4 or L5. Which one is still open."
+}

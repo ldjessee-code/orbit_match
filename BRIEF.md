@@ -88,8 +88,9 @@ Each program stores the addresses in a JSON file. Orbit Match's copy is [site/co
 
 ```text
 other_page = https://ldjessee-code.github.io/jumpgate_starroute/app.html
-other_page = http://127.0.0.1:8080/app.html
 ```
+
+`http://127.0.0.1:8080/app.html` is a stale example. Do not hardcode it. The peer URL comes from the query `?jumpgate=`, then localStorage, then [site/config.json](site/config.json). The local Orbit Match static server listens on `127.0.0.1:8131`. Jumpgate's port stays 8130 in [TODO_PORTS.md](TODO_PORTS.md). The page does not hardcode either port.
 
 The call is that address, a hash, then the thin card as parameters (`h=1`, `host`, `from`, and the rest). The hash stays in the browser. A blank address means the page does not open the other one. The handoff file still saves and opens by hand.
 

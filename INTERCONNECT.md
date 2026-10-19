@@ -16,8 +16,10 @@ rel = noopener
 The address is the builder, then a hash, then the thin card as parameters:
 
 ```text
-https://ldjessee-code.github.io/orbit_match/manual/#h=1&host=tau+Cet&spec=G8.5V&planets=4&holder=Turquenish+Empire&from=Sol
+https://ldjessee-code.github.io/orbit_match/manual/#h=1&host=tau+Cet&spec=G8V&planets=4&holder=Turquenish+Empire&from=Sol
 ```
+
+The sample spectral type is G8V, matching the Tau Ceti lore. The hash still accepts whatever spectral type the map sends.
 
 A local copy uses whatever address is stored for Orbit Match, with `manual/` on the end. The hash is the same.
 

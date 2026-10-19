@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\DougJ\\Documents\\GitHub\\orbit_match\\tools\\hooks\\orbit-guard.ps1\"",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\DougJ\\Documents\\GitHub\\orbit_match\\tools\\hooks\\orbit-stop-gate.ps1\"",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}

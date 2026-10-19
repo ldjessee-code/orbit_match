@@ -1,0 +1,72 @@
+main.viewer-main {
+  max-width: none;
+  width: auto;
+  margin: 0;
+  padding: 0.75rem 1rem 1.5rem;
+}
+
+.dock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.dock p,
+.dock label {
+  margin: 0;
+}
+
+.dock button,
+.dock input {
+  font: inherit;
+}
+
+#crumbs button[aria-current="true"] {
+  border-color: var(--accent);
+}
+
+#readout {
+  min-height: 1.2rem;
+  min-width: 6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#sky {
+  overflow: hidden;
+  max-width: 1600px;
+  background: #070b10;
+  border: 1px solid #2c3848;
+  border-radius: 8px;
+}
+
+#sky [data-callout] {
+  cursor: pointer;
+}
+
+#sky svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 1600px;
+}
+
+#load-status {
+  min-height: 1.2rem;
+  color: var(--warn);
+}
+
+.plate-page main {
+  max-width: 64rem;
+}
+
+.plate-page img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 0 1rem;
+  background: #070b10;
+  border: 1px solid #2c3848;
+  border-radius: 8px;
+}

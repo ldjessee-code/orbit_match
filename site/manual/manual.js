@@ -6,7 +6,8 @@
     source: "",
     header: blankHeader(),
     rows: [],
-    hz: null
+    hz: null,
+    fromDeepLink: false
   };
 
   var starCard = document.getElementById("star-card");
@@ -380,6 +381,8 @@
   function loadStars(text, source) {
     state.stars = O.parseCsv(text);
     state.source = source;
+    var link = window.OrbitBuilderLink;
+    if (state.fromDeepLink || (link && link.parseBuilderHash(location.hash).mode === "load")) return;
     setStatus(state.stars.length + " stars from " + source + ". Search for one in the star section.");
     var hashHost = hashParams().get("host");
     if (hashHost && !edited()) {
@@ -396,6 +399,7 @@
   }
 
   function applyHashOverlay() {
+    if (state.fromDeepLink) return;
     var q = hashParams();
     if (q.get("h") !== "1" && !q.get("host")) return;
     if (!state.header.hostname && q.get("host")) {
@@ -627,7 +631,33 @@
     URL.revokeObjectURL(link.href);
   }
 
-  function loadSystem(text) {
+  function focusLinkedObject(data, objectId) {
+    var link = window.OrbitBuilderLink;
+    var target = link ? link.focusTarget(data, objectId) : null;
+    var marked = document.querySelectorAll(".deep-link-target");
+    for (var i = 0; i < marked.length; i++) marked[i].classList.remove("deep-link-target");
+    var host = state.header.hostname || "the system";
+    if (!target) {
+      setStatus("Opened " + host + ". That object is not in the file.");
+      return;
+    }
+    var el = target.kind === "star" ? starCard : stack.querySelector(target.selector);
+    if (!el) {
+      setStatus("Opened " + host + ". That object is not on the page.");
+      return;
+    }
+    el.classList.add("deep-link-target");
+    if (typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "center" });
+    if (target.kind === "star") {
+      setStatus("Opened " + host + ". The star is selected.");
+      return;
+    }
+    var named = (data.bodies || []).find(function (body) { return body.id === target.id; });
+    setStatus("Opened " + host + ". " + ((named && named.name) || target.id) + " is selected.");
+  }
+
+  function loadSystem(text, options) {
+    var opts = options || {};
     var data = JSON.parse(text);
     var star = data.star || {};
     state.header = blankHeader();
@@ -651,19 +681,51 @@
     state.header.fuel_unit = card.fuel_unit || "";
     state.header.arrivals = (data.arrivals || []).map(function (item) { return item.from_hostname; });
     search.value = state.header.hostname;
+    var link = window.OrbitBuilderLink;
     var list = (data.bodies || []).map(function (body) {
-      body.id = body.id || uid();
-      body.moons = (body.moons || []).map(function (moon) {
+      var next = link ? link.manualBodyFromSystem(body) : body;
+      next.id = next.id || uid();
+      next.moons = (next.moons || []).map(function (moon) {
         moon.id = moon.id || uid();
         return moon;
       });
-      return body;
+      return next;
     });
     refreshHz();
     state.rows = O.withZones(list, state.hz, mass());
     paintStar();
     renderStack();
-    saveLocal();
+    if (opts.persist !== false) saveLocal();
+    if (opts.objectId) focusLinkedObject(data, opts.objectId);
+    else if (opts.persist === false) setStatus("Opened " + (state.header.hostname || "the system") + ".");
+  }
+
+  function bootDeepLink() {
+    var link = window.OrbitBuilderLink;
+    if (!link) {
+      setStatus("The system link did not load.");
+      return;
+    }
+    var plan = link.parseBuilderHash(location.hash);
+    if (plan.mode !== "load") {
+      state.fromDeepLink = false;
+      restoreLocal();
+      if (hashParams().get("host") || hashParams().get("h") === "1") applyHashOverlay();
+      return;
+    }
+    state.fromDeepLink = true;
+    fetch(plan.file)
+      .then(function (response) {
+        if (!response.ok) throw new Error(String(response.status));
+        return response.text();
+      })
+      .then(function (text) {
+        loadSystem(text, { persist: false, objectId: plan.objectId });
+      })
+      .catch(function () {
+        state.fromDeepLink = false;
+        setStatus("The linked system did not load.");
+      });
   }
 
   function saveLocal() {
@@ -748,7 +810,8 @@
 
   paintStar();
   renderStack();
-  restoreLocal();
+  if (hashParams().get("system")) document.addEventListener("DOMContentLoaded", bootDeepLink);
+  else restoreLocal();
 
   fetch("../config.json")
     .then(function (response) { if (!response.ok) throw new Error(String(response.status)); return response.json(); })
@@ -759,8 +822,8 @@
       loadStars(text, "the star map list");
     })
     .catch(function () {
-      if (!state.stars.length) setStatus("The star list did not load. Choose a CSV from the star map.");
+      if (!state.stars.length && !state.fromDeepLink) setStatus("The star list did not load. Choose a CSV from the star map.");
     });
 
-  if (hashParams().get("host") || hashParams().get("h") === "1") applyHashOverlay();
+  if (!hashParams().get("system") && (hashParams().get("host") || hashParams().get("h") === "1")) applyHashOverlay();
 })();

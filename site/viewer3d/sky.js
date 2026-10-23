@@ -74,8 +74,14 @@ export function beltHalfHeight(innerR, outerR) {
 }
 
 export function beltSeed(id) {
+  if (id === 'b1') return SKY_SEED + 7;
   if (id === 'b2') return SKY_SEED + 101;
-  return SKY_SEED + 7;
+  const text = String(id == null ? '' : id);
+  let hash = SKY_SEED + 17;
+  for (let i = 0; i < text.length; i++) {
+    hash = (Math.imul(hash, 33) + text.charCodeAt(i)) >>> 0;
+  }
+  return hash;
 }
 
 export function dustIsPickable() {
@@ -83,17 +89,15 @@ export function dustIsPickable() {
 }
 
 export function dustBands(belts) {
-  const order = ['b1', 'b2'];
   const out = [];
-  order.forEach(function (id) {
-    const belt = (belts || []).find(function (item) { return item && item.id === id; });
+  (belts || []).forEach(function (belt) {
     if (!belt) return;
     const innerIn = Number(belt.innerR);
     const outerIn = Number(belt.outerR);
     if (!Number.isFinite(innerIn) || !Number.isFinite(outerIn)) return;
     const innerR = Math.min(innerIn, outerIn);
     const outerR = Math.max(innerIn, outerIn);
-    out.push({
+    const band = {
       id: belt.id,
       name: belt.name,
       innerAu: belt.innerAu,
@@ -101,10 +105,66 @@ export function dustBands(belts) {
       innerR: innerR,
       outerR: outerR,
       halfHeight: beltHalfHeight(innerR, outerR),
-      seed: beltSeed(belt.id)
-    });
+      seed: beltSeed(belt.id),
+      features: belt.features || []
+    };
+    if (belt.density != null && Number.isFinite(Number(belt.density))) band.density = Number(belt.density);
+    if (belt.dustiness != null && Number.isFinite(Number(belt.dustiness))) band.dustiness = Number(belt.dustiness);
+    out.push(band);
   });
   return out;
+}
+
+export function beltSampleWeight(radius, angle, features) {
+  let weight = 1;
+  const list = features || [];
+  for (let i = 0; i < list.length; i++) {
+    const feat = list[i];
+    if (!feat) continue;
+    const half = Number(feat.halfWidth);
+    const d = Math.abs(Number(radius) - Number(feat.radius));
+    if (feat.type === 'gap') {
+      if (!(half > 0) || d >= half) continue;
+      const t = d / half;
+      const envelope = 0.5 + 0.5 * Math.cos(Math.PI * (1 - t));
+      const depth = Number.isFinite(Number(feat.depth)) ? Number(feat.depth) : 0.85;
+      let factor = 1 - depth * (1 - envelope);
+      if (factor < 0) factor = 0;
+      weight *= factor;
+    } else if (feat.type === 'clump') {
+      if (!(half > 0) || d >= half) continue;
+      const t = 1 - d / half;
+      const gain = Number.isFinite(Number(feat.gain)) ? Number(feat.gain) : 1.6;
+      const radial = 1 + (gain - 1) * t * t;
+      let az = 1;
+      const azFeat = feat.azimuthal;
+      if (azFeat && Number(azFeat.n)) {
+        const n = Number(azFeat.n);
+        const phase = Number(azFeat.phase) || 0;
+        const azGain = Number.isFinite(Number(azFeat.gain)) ? Number(azFeat.gain) : 0.5;
+        az = 1 + azGain * Math.cos(n * (Number(angle) - phase));
+      }
+      weight *= radial * az;
+    }
+  }
+  if (weight < 0) weight = 0;
+  return weight;
+}
+
+function maxFeatureWeight(features) {
+  let maxW = 1;
+  const list = features || [];
+  for (let i = 0; i < list.length; i++) {
+    const feat = list[i];
+    if (!feat || feat.type !== 'clump') continue;
+    const gain = Number.isFinite(Number(feat.gain)) ? Number(feat.gain) : 1.6;
+    const azGain = feat.azimuthal && Number.isFinite(Number(feat.azimuthal.gain))
+      ? Number(feat.azimuthal.gain)
+      : 0;
+    const peak = gain * (1 + azGain);
+    if (peak > maxW) maxW = peak;
+  }
+  return maxW;
 }
 
 export function generateBeltSamples(spec) {
@@ -128,16 +188,29 @@ export function generateBeltSamples(spec) {
   const jitter = new Float32Array(count);
   const rng = mulberry32(seed);
   const span = outer - inner;
+  const features = Array.isArray(source.features) ? source.features : [];
+  const useWeight = features.length > 0;
+  const maxW = useWeight ? maxFeatureWeight(features) : 1;
   for (let i = 0; i < count; i++) {
-    const angle = rng() * Math.PI * 2;
-    const radialU = (rng() + rng() + rng()) / 3;
-    const heightU = (rng() + rng() + rng()) / 3;
-    let radius = inner + span * radialU;
-    let y = (heightU - 0.5) * 2 * half;
-    if (radius < inner) radius = inner;
-    if (radius > outer) radius = outer;
-    if (y > half) y = half;
-    if (y < -half) y = -half;
+    let angle = 0;
+    let radius = inner;
+    let y = 0;
+    const attempts = useWeight ? 64 : 1;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      angle = rng() * Math.PI * 2;
+      // Featured belts draw radius uniformly. (u+u+u)/3 piles up mid-span and starves inner-edge clumps.
+      const radialU = useWeight ? rng() : (rng() + rng() + rng()) / 3;
+      const heightU = (rng() + rng() + rng()) / 3;
+      radius = inner + span * radialU;
+      y = (heightU - 0.5) * 2 * half;
+      if (radius < inner) radius = inner;
+      if (radius > outer) radius = outer;
+      if (y > half) y = half;
+      if (y < -half) y = -half;
+      if (!useWeight) break;
+      const weight = beltSampleWeight(radius, angle, features);
+      if (rng() * maxW <= weight) break;
+    }
     // Orbital plane is XZ. Negative sine matches frame.toThree.
     positions[i * 3] = Math.cos(angle) * radius;
     positions[i * 3 + 1] = y;
@@ -247,4 +320,46 @@ export function starfieldRgba(width, height, seed) {
     writeSkyPixel(rgba, width, height, x, y + 1, r * dim, g * dim, b * dim);
   }
   return rgba;
+}
+
+const DEG_TO_RAD = Math.PI / 180;
+
+export function skyBackgroundRotation(sky) {
+  const identity = { x: 0, y: 0, z: 0 };
+  if (!sky || typeof sky !== 'object') return identity;
+  const deg = sky.rotation_deg;
+  if (typeof deg === 'number' && Number.isFinite(deg)) {
+    return { x: deg * DEG_TO_RAD, y: 0, z: 0 };
+  }
+  if (deg && typeof deg === 'object' && !Array.isArray(deg)) {
+    return {
+      x: (Number(deg.x) || 0) * DEG_TO_RAD,
+      y: (Number(deg.y) || 0) * DEG_TO_RAD,
+      z: (Number(deg.z) || 0) * DEG_TO_RAD
+    };
+  }
+  const rad = sky.background_rotation;
+  if (Array.isArray(rad) && rad.length >= 3) {
+    return {
+      x: Number(rad[0]) || 0,
+      y: Number(rad[1]) || 0,
+      z: Number(rad[2]) || 0
+    };
+  }
+  return identity;
+}
+
+export function skyReference(system) {
+  const sky = system && system.sky && typeof system.sky === 'object' ? system.sky : null;
+  const raw = sky && typeof sky.equirect === 'string' ? sky.equirect.trim() : '';
+  const url = raw && raw.indexOf('..') < 0 && raw.indexOf('\\') < 0 ? raw : '';
+  return {
+    mode: url ? 'equirect' : 'procedural',
+    url: url || null,
+    mapping: 'EquirectangularReflectionMapping',
+    colorSpace: 'srgb',
+    frame: sky && sky.frame ? sky.frame : null,
+    poleRotationApplied: !!(sky && sky.pole_rotation_applied),
+    rotation: skyBackgroundRotation(sky)
+  };
 }

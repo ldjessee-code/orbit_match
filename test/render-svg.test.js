@@ -187,7 +187,8 @@ test('Kakakiko close-up uses the synchronous ring, not moon Lagrange stations', 
 test('home page points at the viewer and the page does not embed the fixture', function () {
   const home = read('site/index.html');
   assert.match(home, /View Tau Ceti/);
-  assert.match(home, /href="viewer\/"/);
+  assert.match(home, /href="viewer3d\/"/);
+  assert.match(home, /href="viewer\/\?view=svg"/);
   const page = read('site/viewer/index.html');
   assert.match(page, /type="module"/);
   assert.match(page, /paused/i);

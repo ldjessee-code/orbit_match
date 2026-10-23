@@ -95,6 +95,44 @@
       "bodies.b2.orbit.a_outer_au"
     ]
   },
+  "rings_belts": {
+    "provenance": {
+      "version": "v2.41j",
+      "source": "Tau_Cet_system_v2.md v2.41j; rings_belts_orbitwatch_data_20261020.md",
+      "source_sha256": "9057b24cb2d095b30e96a1a4d8a2f4093b6ae19844c86b3b1dc7a3d1bdc15502",
+      "handoff_sha256": "B3F9ABB14F8CB5B37727A6E7DA6173D47FA42DBA5BEF0DF31EBF650A6BB427CE",
+      "copied": "2026-10-20"
+    },
+    "star": {
+      "mass_msun": { "value": 0.78, "tag": "real" },
+      "lum_lsun": { "value": 0.5, "tag": "est.", "note": "YAML value; system star.lum_solar stays 0.488 from v2.41c" }
+    },
+    "dust_level_x_sol": [
+      { "a_au": { "min": 0.1, "max": 1.1, "tag": "fiction" }, "level": { "value": 10, "tag": "fiction" } },
+      { "a_au": { "min": 1.1, "max": 1.6, "tag": "fiction" }, "level": { "min": 10, "max": 20, "tag": "fiction" }, "note": "Sombrero" },
+      { "a_au": { "min": 1.6, "max": 10, "tag": "fiction" }, "level": { "value": 20, "tag": "fiction" }, "note": "ramp through giants zone" },
+      { "a_au": { "value": 10, "tag": "fiction" }, "level": { "value": 20, "tag": "fiction" } },
+      { "a_au": { "min": 20, "max": 45, "tag": "fiction" }, "level": { "value": 100, "tag": "fiction" }, "note": "Outer Wall core" },
+      { "a_au": { "value": 52, "tag": "fiction" }, "level": { "value": 30, "tag": "fiction" } }
+    ],
+    "travel": {
+      "concern_threshold_x_sol": { "value": 1000, "tag": "fiction" },
+      "shielding": { "value": "standard forward Whipple bumper", "tag": "fiction" }
+    },
+    "cue_ball_ring_source": "data-belt",
+    "format_flags": [
+      { "key": "star.lum_lsun", "value": 0.5, "tag": "est.", "note": "YAML 0.5 vs system lum_solar 0.488; not applied to star" },
+      { "key": "belts.sombrero.half_thickness_deg", "value": 10, "tag": "fiction", "note": "angular thickness; catalog belts keep the Cartesian 0.28 slab" },
+      { "key": "belts.outer_wall.half_thickness_deg", "value": 10, "tag": "fiction", "note": "angular thickness; catalog belts keep the Cartesian 0.28 slab" },
+      { "key": "belts.outer_wall.disk", "value": "real disk ~6-55 AU; setting 10-52", "tag": "setting", "note": "inner 10 AU stays real; outer updated 50 to 52" },
+      { "key": "giants.cue_ball.rings.haze.tilt", "value": "tilted field-held haze", "tag": "fiction", "note": "tilt mentioned; no angle given; inclination stays 0" },
+      { "key": "giants.eight_ball.rings.haze.tilt", "value": "tilted field-held haze", "tag": "fiction", "note": "tilt mentioned; no angle given; inclination stays 0" },
+      { "key": "giants.eight_ball.rings.phoebe_like", "value": "300-560 Rp", "tag": "fiction", "note": "too large for planet display-radius scaling; stored, not drawn" },
+      { "key": "giants.cue_ball.rings.F.width_km", "value": 50, "tag": "fiction", "note": "below display resolution; drawn with a 0.004 scene-unit floor" },
+      { "key": "giants.eight_ball.rings.ringlet.width_km", "value": 20, "tag": "fiction", "note": "below display resolution; drawn with a 0.004 scene-unit floor" },
+      { "key": "canon.est_spelling", "value": "est.", "tag": "est.", "note": "source uses est. with a period; existing body.canon uses est" }
+    ]
+  },
   "epoch": {
     "t0_days": 0,
     "label": "T+0 (circa 1600 yrs hence)",
@@ -104,6 +142,12 @@
     "hostname": "tau Cet",
     "name": "Tau Ceti",
     "setting_name": "Turquenish",
+    "star_key": "gaia:2452378776434477184",
+    "gaia_source_id": "2452378776434477184",
+    "hyg_id": "8087",
+    "hip": "8102",
+    "hd": "10700",
+    "model": "models/tau-ceti.glb",
     "spectype": "G8V",
     "mass_solar": 0.78,
     "lum_solar": 0.488,
@@ -113,10 +157,17 @@
     "hz_inner_au": 0.68,
     "hz_outer_au": 1.22
   },
+  "sky": {
+    "equirect": "sky/tauceti_sky_equirect_4k.png",
+    "frame": "icrs",
+    "pole_rotation_applied": false,
+    "rotation_deg": null
+  },
   "bodies": [
     {
       "id": "tc1",
       "name": "Gane",
+      "model": "models/gane.glb",
       "display": { "color": "#a15a3a" },
       "designation": "tC 1",
       "kind": "planet",
@@ -129,6 +180,7 @@
     {
       "id": "tc2",
       "name": "Hornstooth",
+      "model": "models/hornstooth.glb",
       "display": { "color": "#8d6b4a" },
       "designation": "tC 2",
       "kind": "planet",
@@ -141,6 +193,7 @@
     {
       "id": "tc3",
       "name": "Husk",
+      "model": "models/husk.glb",
       "display": { "color": "#7d7872" },
       "designation": "tC 3",
       "kind": "planet",
@@ -153,6 +206,7 @@
     {
       "id": "tc4",
       "name": "Sable",
+      "model": "models/sable.glb",
       "display": { "color": "#2c3036" },
       "designation": "tC 4",
       "kind": "planet",
@@ -165,6 +219,13 @@
     {
       "id": "tc5",
       "name": "Kakakiko",
+      "model": "models/kakakiko.glb",
+      "layers": [
+        { "key": "clouds", "node": "SM_kakakiko_clouds", "label": "Clouds", "default": true },
+        { "key": "seaice-north", "node": "SM_kakakiko_seaice_north_winter", "label": "N winter sea ice", "default": true },
+        { "key": "seaice-south", "node": "SM_kakakiko_seaice_south_winter", "label": "S winter sea ice", "default": false },
+        { "key": "atmosphere", "node": "SM_kakakiko_atmosphere_PLACEHOLDER", "label": "Atmosphere glow", "default": true }
+      ],
       "display": { "color": "#2f6f9a" },
       "designation": "tC 5",
       "kind": "planet",
@@ -177,6 +238,7 @@
     {
       "id": "tc5a",
       "name": "Shudder",
+      "model": "models/shudder.glb",
       "display": { "color": "#8d8680" },
       "designation": "tC 5a",
       "kind": "moon",
@@ -189,6 +251,7 @@
     {
       "id": "tc5b",
       "name": "Der Eindringling",
+      "model": "models/der-eindringling.glb",
       "display": { "color": "#6a5e52" },
       "designation": "tC 5b",
       "kind": "moon",
@@ -234,17 +297,45 @@
     {
       "id": "b1",
       "name": "The Sombrero",
-      "display": { "color": "#c2b48a" },
+      "display": { "color": "#c2b48a", "density": 2, "dustiness": 40 },
       "designation": "B1",
       "kind": "belt",
       "parent": null,
       "orbit": { "a_inner_au": 1.1, "a_outer_au": 1.6 },
       "canon": { "orbit.a_inner_au": "fiction", "orbit.a_outer_au": "fiction" },
-      "source": "Tau_Cet_system_v2.md §5"
+      "source": "Tau_Cet_system_v2.md §5",
+      "belt_structure": {
+        "tag": "fiction",
+        "half_thickness_deg": { "value": 10, "tag": "fiction" },
+        "mass_me": { "value": 0.004, "tag": "fiction" },
+        "n_gt_1km": { "value": 1.0e7, "tag": "fiction" },
+        "n_gt_100km": { "value": 2000, "tag": "fiction" },
+        "largest_km": { "value": 1100, "tag": "fiction" },
+        "next_largest": { "value": "~5 bodies of 500-600 km", "tag": "fiction" },
+        "mean_spacing_km": { "value": 870000, "tag": "fiction" },
+        "resonances_with_croquet_au": {
+          "4:1": { "value": 1.111, "tag": "derived" },
+          "3:1": { "value": 1.346, "tag": "derived" },
+          "5:2": { "value": 1.520, "tag": "derived" },
+          "7:3": { "value": 1.592, "tag": "derived" },
+          "2:1": { "value": 1.764, "tag": "derived", "note": "outside the 1.6 AU outer edge; data-only" }
+        },
+        "gaps_au": [
+          { "value": 1.346, "tag": "fiction", "resonance": "3:1", "half_width_au": { "value": 0.018, "tag": "est." }, "depth": { "value": 0.9, "tag": "est." } },
+          { "value": 1.520, "tag": "fiction", "resonance": "5:2", "half_width_au": { "value": 0.014, "tag": "est." }, "depth": { "value": 0.85, "tag": "est." } },
+          { "value": 1.592, "tag": "fiction", "resonance": "7:3", "half_width_au": { "value": 0.012, "tag": "est." }, "depth": { "value": 0.8, "tag": "est." } }
+        ],
+        "kakakiko_trap_au": {
+          "1:2": { "value": 1.127, "tag": "derived" },
+          "2:3": { "value": 0.93, "tag": "derived", "note": "inside Kakakiko; outside the Sombrero" },
+          "3:4": { "value": 0.86, "tag": "derived", "note": "inside Kakakiko; outside the Sombrero" }
+        }
+      }
     },
     {
       "id": "tc6",
       "name": "Croquet Ball",
+      "model": "models/croquet-ball.glb",
       "display": { "color": "#d4bc7a", "stripes": true, "stripe": "#f4efe4" },
       "designation": "tC 6",
       "kind": "planet",
@@ -252,7 +343,27 @@
       "orbit": { "a_au": 2.8, "period_days": 1939.4775 },
       "physical": { "mass_earth": 95, "radius_km": 58200 },
       "canon": { "name": "locked", "orbit.a_au": "est", "physical.mass_earth": "est" },
-      "source": "Tau_Cet_system_v2.md §6.6"
+      "source": "Tau_Cet_system_v2.md §6.6",
+      "ring_system": {
+        "tag": "fiction",
+        "option": "A, faint dust",
+        "planet_radius_km": { "value": 58200, "tag": "est" },
+        "density_g_cm3": { "value": 0.688, "tag": "est." },
+        "roche_km": {
+          "ice_fluid": { "value": 130700, "tag": "est." },
+          "rock_fluid": { "value": 87500, "tag": "est." }
+        },
+        "visibility": { "value": "not visible from a distance; visible up close, best back-lit", "tag": "fiction" },
+        "bands": [
+          { "name": "halo", "r_in_km": { "value": 75700, "tag": "fiction" }, "r_out_km": { "value": 87300, "tag": "fiction" }, "r_in_rp": { "value": 1.30, "tag": "fiction" }, "r_out_rp": { "value": 1.50, "tag": "fiction" }, "tau": { "value": 1.0e-6, "tag": "fiction" }, "note": "field-held charged haze" },
+          { "name": "main", "r_in_km": { "value": 90200, "tag": "fiction" }, "r_out_km": { "value": 101900, "tag": "fiction" }, "r_in_rp": { "value": 1.55, "tag": "fiction" }, "r_out_rp": { "value": 1.75, "tag": "fiction" }, "tau": { "value": 3.0e-6, "tag": "fiction" } },
+          { "name": "gossamer", "r_in_km": { "value": 101900, "tag": "fiction" }, "r_out_km": { "value": 186200, "tag": "fiction" }, "r_in_rp": { "value": 1.75, "tag": "fiction" }, "r_out_rp": { "value": 3.20, "tag": "fiction" }, "tau": { "value": 1.0e-7, "tag": "fiction" } }
+        ],
+        "moonlets": [
+          { "a_km": { "value": 100100, "tag": "fiction" }, "a_rp": { "value": 1.72, "tag": "fiction" }, "radius_km": { "value": 10, "tag": "fiction" } },
+          { "a_km": { "value": 102400, "tag": "fiction" }, "a_rp": { "value": 1.76, "tag": "fiction" }, "radius_km": { "value": 20, "tag": "fiction" } }
+        ]
+      }
     },
     {
       "id": "tc6gate",
@@ -268,6 +379,7 @@
     {
       "id": "tc7",
       "name": "Cue Ball",
+      "model": "models/cue-ball.glb",
       "display": { "color": "#f3f1ea" },
       "rings": true,
       "designation": "tC 7",
@@ -276,11 +388,40 @@
       "orbit": { "a_au": 5.5, "period_days": 5332.65 },
       "physical": { "mass_earth": 17, "radius_km": 24600 },
       "canon": { "name": "locked", "orbit.a_au": "est", "physical.mass_earth": "est" },
-      "source": "Tau_Cet_system_v2.md §6.7"
+      "source": "Tau_Cet_system_v2.md §6.7",
+      "ring_system": {
+        "tag": "fiction",
+        "material": "water ice",
+        "planet_radius_km": { "value": 24600, "tag": "est" },
+        "density_g_cm3": { "value": 1.636, "tag": "est." },
+        "roche_km": {
+          "ice_fluid": { "value": 73700, "tag": "est." },
+          "rock_fluid": { "value": 49400, "tag": "est." }
+        },
+        "ring_mass_kg": { "value": 5.0e18, "tag": "est." },
+        "draw_source": "data-belt",
+        "bands": [
+          { "name": "haze", "r_in_km": { "value": 25830, "tag": "fiction" }, "r_out_km": { "value": 30750, "tag": "fiction" }, "r_in_rp": { "value": 1.05, "tag": "fiction" }, "r_out_rp": { "value": 1.25, "tag": "fiction" }, "tau": { "value": 1.0e-5, "tag": "fiction" }, "note": "tilted field-held haze" },
+          { "name": "D", "r_in_km": { "value": 27100, "tag": "fiction" }, "r_out_km": { "value": 30800, "tag": "fiction" }, "r_in_rp": { "value": 1.10, "tag": "fiction" }, "r_out_rp": { "value": 1.25, "tag": "fiction" }, "tau": { "value": 1.0e-4, "tag": "fiction" } },
+          { "name": "C", "r_in_km": { "value": 30800, "tag": "fiction" }, "r_out_km": { "value": 38100, "tag": "fiction" }, "r_in_rp": { "value": 1.25, "tag": "fiction" }, "r_out_rp": { "value": 1.55, "tag": "fiction" }, "tau": { "value": 0.1, "tag": "fiction" } },
+          { "name": "B", "r_in_km": { "value": 38100, "tag": "fiction" }, "r_out_km": { "value": 50400, "tag": "fiction" }, "r_in_rp": { "value": 1.55, "tag": "fiction" }, "r_out_rp": { "value": 2.05, "tag": "fiction" }, "tau": { "min": 2, "max": 5, "tag": "fiction" }, "note": "spokes" },
+          { "name": "cassini_like_gap", "r_in_km": { "value": 50400, "tag": "fiction" }, "r_out_km": { "value": 52900, "tag": "fiction" }, "r_in_rp": { "value": 2.05, "tag": "fiction" }, "r_out_rp": { "value": 2.15, "tag": "fiction" }, "tau": { "value": 0, "tag": "fiction", "note": "gap; tau omitted in source" }, "draw": false },
+          { "name": "A", "r_in_km": { "value": 52900, "tag": "fiction" }, "r_out_km": { "value": 64000, "tag": "fiction" }, "r_in_rp": { "value": 2.15, "tag": "fiction" }, "r_out_rp": { "value": 2.60, "tag": "fiction" }, "tau": { "min": 0.5, "max": 1, "tag": "fiction" }, "gap_km": [{ "value": 61350, "tag": "fiction" }, { "value": 61650, "tag": "fiction" }] },
+          { "name": "F", "r_center_km": { "value": 67600, "tag": "fiction" }, "r_rp": { "value": 2.75, "tag": "fiction" }, "width_km": { "value": 50, "tag": "fiction" }, "tau": { "min": 0.1, "max": 0.5, "tag": "fiction" } },
+          { "name": "E", "r_in_km": { "value": 86100, "tag": "fiction" }, "r_out_km": { "value": 172200, "tag": "fiction" }, "r_in_rp": { "value": 3.5, "tag": "fiction" }, "r_out_rp": { "value": 7.0, "tag": "fiction" }, "tau": { "value": 1.0e-6, "tag": "fiction" }, "optional": true }
+        ],
+        "moonlets": [
+          { "name": "M1", "a_km": { "value": 82000, "tag": "fiction" }, "a_rp": { "value": 3.33, "tag": "fiction" }, "radius_km": { "value": 75, "tag": "fiction" }, "role": "2:1 clears the Cassini-like gap" },
+          { "name": "encke_moonlet", "a_km": { "value": 61500, "tag": "fiction" }, "a_rp": { "value": 2.50, "tag": "fiction" }, "radius_km": { "value": 12, "tag": "fiction" } },
+          { "name": "F_shepherd_in", "a_km": { "value": 66670, "tag": "fiction" }, "a_rp": { "value": 2.71, "tag": "fiction" }, "radius_km": { "value": 18, "tag": "fiction" } },
+          { "name": "F_shepherd_out", "a_km": { "value": 68630, "tag": "fiction" }, "a_rp": { "value": 2.79, "tag": "fiction" }, "radius_km": { "value": 15, "tag": "fiction" } }
+        ]
+      }
     },
     {
       "id": "tc8",
       "name": "Eight Ball",
+      "model": "models/eight-ball.glb",
       "display": { "color": "#16181c" },
       "designation": "tC 8",
       "kind": "planet",
@@ -288,18 +429,66 @@
       "orbit": { "a_au": 9.2, "period_days": 11541.9 },
       "physical": { "mass_earth": 13, "radius_km": 24500 },
       "canon": { "name": "locked", "physical.mass_earth": "locked", "physical.radius_km": "est" },
-      "source": "Tau_Cet_system_v2.md §6.8"
+      "source": "Tau_Cet_system_v2.md §6.8",
+      "ring_system": {
+        "tag": "fiction",
+        "material": "dark dust",
+        "planet_radius_km": { "value": 24500, "tag": "est" },
+        "density_g_cm3": { "value": 1.266, "tag": "est." },
+        "roche_km": {
+          "ice_fluid": { "value": 67400, "tag": "est." },
+          "rock_fluid": { "value": 45100, "tag": "est." }
+        },
+        "hill_radius_km": { "value": 35200000, "tag": "est." },
+        "bands": [
+          { "name": "haze", "r_in_km": { "value": 29400, "tag": "fiction" }, "r_out_km": { "value": 34300, "tag": "fiction" }, "r_in_rp": { "value": 1.20, "tag": "fiction" }, "r_out_rp": { "value": 1.40, "tag": "fiction" }, "tau": { "value": 1.0e-6, "tag": "fiction" }, "note": "tilted field-held haze" },
+          { "name": "inner_dust", "r_in_km": { "value": 34300, "tag": "fiction" }, "r_out_km": { "value": 53900, "tag": "fiction" }, "r_in_rp": { "value": 1.40, "tag": "fiction" }, "r_out_rp": { "value": 2.20, "tag": "fiction" }, "tau": { "min": 1.0e-5, "max": 1.0e-4, "tag": "fiction" } },
+          { "name": "ringlet", "r_center_km": { "value": 49000, "tag": "fiction" }, "r_rp": { "value": 2.00, "tag": "fiction" }, "width_km": { "value": 20, "tag": "fiction" }, "tau": { "value": 0.3, "tag": "fiction" }, "optional": true },
+          { "name": "phoebe_like", "r_in_km": { "value": 7300000, "tag": "fiction" }, "r_out_km": { "value": 13700000, "tag": "fiction" }, "r_in_rp": { "value": 300, "tag": "fiction" }, "r_out_rp": { "value": 560, "tag": "fiction" }, "tau": { "value": 1.0e-8, "tag": "fiction" }, "source_moon_a_km": { "value": 10600000, "tag": "fiction" }, "retrograde": true, "draw": false }
+        ]
+      }
     },
     {
       "id": "b2",
       "name": "Outer Wall",
-      "display": { "color": "#aeb6b0" },
+      "display": { "color": "#aeb6b0", "density": 2, "dustiness": 40 },
       "designation": "B2",
       "kind": "belt",
       "parent": null,
-      "orbit": { "a_inner_au": 10, "a_outer_au": 50 },
+      "orbit": { "a_inner_au": 10, "a_outer_au": 52 },
       "canon": { "orbit.a_inner_au": "real", "orbit.a_outer_au": "est" },
-      "source": "Tau_Cet_system_v2.md §5"
+      "source": "Tau_Cet_system_v2.md §5",
+      "belt_structure": {
+        "tag": "setting",
+        "half_thickness_deg": { "value": 10, "tag": "fiction" },
+        "mass_colliders_me": { "value": 1.2, "tag": "real" },
+        "mass_total_me": { "value": 2.0, "tag": "est." },
+        "n_gt_1km": { "value": 3.0e10, "tag": "est." },
+        "n_gt_100km": { "value": 1.0e6, "tag": "est." },
+        "largest": { "value": "3-4 Pluto-class, 2000-2800 km", "tag": "est." },
+        "mean_spacing_km": { "value": 2100000, "tag": "est." },
+        "resonant_clumps_with_eight_ball_au": {
+          "3:2": {
+            "value": 12.06,
+            "tag": "fiction",
+            "half_width_au": { "value": 0.35, "tag": "est." },
+            "gain": { "value": 1.8, "tag": "est." },
+            "azimuthal": {
+              "n": { "value": 2, "tag": "est." },
+              "phase": { "value": 0, "tag": "est." },
+              "gain": { "value": 0.7, "tag": "est." }
+            }
+          },
+          "5:3": { "value": 12.93, "tag": "fiction", "draw": false, "note": "stored; viewer modulates 3:2 and 2:1" },
+          "2:1": {
+            "value": 14.60,
+            "tag": "fiction",
+            "half_width_au": { "value": 0.45, "tag": "est." },
+            "gain": { "value": 1.6, "tag": "est." }
+          }
+        },
+        "eight_ball_chaotic_zone_edge_au": { "value": 9.9, "tag": "est." }
+      }
     }
   ]
 }

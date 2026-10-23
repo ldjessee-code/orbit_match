@@ -90,7 +90,7 @@ test('pure modules do not import three and the page points at the pinned build',
   assert.doesNotMatch(client, /import\s+[^;]*from\s+['"]three['"]/);
   assert.match(read('site/index.html'), /viewer3d\//);
   assert.match(read('site/index.html'), /3D view/);
-  assert.match(read('site/viewer3d/viewer3d.css'), /70vh/);
+  assert.match(read('site/viewer3d/viewer3d.css'), /78vh/);
 });
 
 test('system scene names Tau Ceti bodies and keeps schematic spacing wider than linear', async function () {
@@ -693,13 +693,16 @@ test('dust belt samples are deterministic and stay inside the torus', async func
     { id: 'b2', name: 'Outer Wall', innerAu: 10, outerAu: 50, innerR: 12, outerR: 14 },
     { id: 'other', innerR: 1, outerR: 2 }
   ]);
-  assert.equal(bands.length, 2);
+  assert.equal(bands.length, 3);
   assert.equal(bands[0].id, 'b1');
   assert.equal(bands[0].innerR, 7);
   assert.equal(bands[0].outerR, 8);
   assert.equal(bands[0].seed, sky.beltSeed('b1'));
   assert.equal(bands[1].id, 'b2');
   assert.equal(bands[1].seed, sky.beltSeed('b2'));
+  assert.equal(bands[2].id, 'other');
+  assert.equal(bands[2].innerR, 1);
+  assert.equal(bands[2].outerR, 2);
   assert.ok(bands[0].halfHeight > 0);
   assert.deepEqual(sky.dustBands([{ id: 'b1' }]), []);
   assert.notEqual(sky.beltSeed('b1'), sky.beltSeed('b2'));
@@ -721,7 +724,7 @@ test('Tau Ceti dust radii sit between the neighboring orbits', async function ()
     assert.equal(kuiper.id, 'b2');
     assert.equal(kuiper.name, 'Outer Wall');
     assert.equal(kuiper.innerAu, 10);
-    assert.equal(kuiper.outerAu, 50);
+    assert.equal(kuiper.outerAu, 52);
     assert.ok(asteroid.innerR > sceneRadius(scene, 'tc5'), mode + ' tc5 ' + sceneRadius(scene, 'tc5'));
     assert.ok(asteroid.outerR < sceneRadius(scene, 'tc6'), mode + ' tc6 ' + sceneRadius(scene, 'tc6'));
     assert.ok(kuiper.innerR > sceneRadius(scene, 'tc8'), mode + ' tc8 ' + sceneRadius(scene, 'tc8'));
@@ -810,16 +813,10 @@ test('viewer3d mounts the starfield and keeps dust out of the raycaster', functi
   const page = read('site/viewer3d/index.html');
   assert.doesNotMatch(page, /id="dust-density"/);
   assert.doesNotMatch(page, /id="dust-dustiness"/);
-  assert.match(page, /The Sombrero/);
-  assert.match(page, /Outer Wall/);
-  assert.match(page, /id="belt-b1-density"[^>]*min="0"/);
-  assert.match(page, /id="belt-b1-density"[^>]*max="4"/);
-  assert.match(page, /id="belt-b1-density"[^>]*value="2"/);
-  assert.match(page, /id="belt-b2-density"[^>]*value="2"/);
-  assert.match(page, /id="belt-b1-dustiness"[^>]*min="0"/);
-  assert.match(page, /id="belt-b1-dustiness"[^>]*max="100"/);
-  assert.match(page, /id="belt-b1-dustiness"[^>]*value="40"/);
-  assert.match(page, /id="belt-b2-dustiness"[^>]*value="40"/);
+  assert.doesNotMatch(page, /id="distance-mode"/);
+  assert.match(page, /id="lore-settings"/);
+  assert.match(page, /Lore based settings/);
+  assert.doesNotMatch(page, /<details id="lore-settings"[^>]*\sopen/);
   assert.match(client, /starfieldSpec/);
   assert.match(client, /starfieldRgba/);
   assert.match(client, /backgroundRecord/);
@@ -839,10 +836,10 @@ test('viewer3d mounts the starfield and keeps dust out of the raycaster', functi
   assert.match(client, /withDustiness/);
   assert.match(client, /updateRingBeltFrame/);
   assert.match(client, /sizeAttenuation:\s*true/);
-  assert.match(client, /getElementById\('belt-b1-density'\)/);
-  assert.match(client, /getElementById\('belt-b2-density'\)/);
-  assert.match(client, /getElementById\('belt-b1-dustiness'\)/);
-  assert.match(client, /getElementById\('belt-b2-dustiness'\)/);
+  assert.match(client, /data-belt-density/);
+  assert.match(client, /data-belt-dustiness/);
+  assert.match(client, /loreSettingsFromSystem/);
+  assert.doesNotMatch(client, /getElementById\('belt-b1-density'\)/);
   const mount = client.match(/function mountDustBelts\([\s\S]*?\n\}/);
   assert.ok(mount, 'mountDustBelts');
   assert.match(mount[0], /emptyRaycast/);

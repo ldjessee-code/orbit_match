@@ -79,7 +79,8 @@ function placeSamples(belt) {
     outerR: belt.outerRadius,
     halfHeight: belt.thickness / 2,
     count: belt.count,
-    seed: belt.seed
+    seed: belt.seed,
+    features: belt.features
   });
   return Object.assign({}, belt, {
     local: local,
@@ -124,6 +125,8 @@ function normalizeRingBelt(config) {
     countShare: countShare,
     innerAu: source.innerAu,
     outerAu: source.outerAu,
+    features: Array.isArray(source.features) ? source.features : [],
+    drawSolid: source.drawSolid === true,
     style: dustinessStyle(dustiness)
   };
 }
@@ -179,12 +182,144 @@ export function ringBeltsFromBands(bands, settingsById) {
       thickness: Number(band.halfHeight) * 2,
       inclination: 0,
       seed: band.seed,
-      density: saved.density == null ? DENSITY_DEFAULT : saved.density,
-      dustiness: saved.dustiness == null ? DUSTINESS_DEFAULT : saved.dustiness,
+      density: saved.density == null ? (band.density == null ? DENSITY_DEFAULT : band.density) : saved.density,
+      dustiness: saved.dustiness == null ? (band.dustiness == null ? DUSTINESS_DEFAULT : band.dustiness) : saved.dustiness,
       follow: 'star',
       innerAu: band.innerAu,
-      outerAu: band.outerAu
+      outerAu: band.outerAu,
+      features: band.features || []
     }));
+  });
+  return list;
+}
+
+export function ringKmToScene(rKm, planetRadiusKm, displayRadius) {
+  const r = Number(rKm);
+  const planet = Number(planetRadiusKm);
+  const display = Number(displayRadius);
+  if (!(planet > 0) || !(display > 0) || !Number.isFinite(r)) return 0;
+  return display * (r / planet);
+}
+
+function taggedValue(node) {
+  if (node == null || typeof node !== 'object') {
+    const n = Number(node);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof node.value === 'number' && Number.isFinite(node.value)) return node.value;
+  if (typeof node.min === 'number' && typeof node.max === 'number' && node.min > 0 && node.max > 0) {
+    return Math.sqrt(node.min * node.max);
+  }
+  if (typeof node.min === 'number' && Number.isFinite(node.min)) return node.min;
+  if (typeof node.max === 'number' && Number.isFinite(node.max)) return node.max;
+  return null;
+}
+
+function tauToDustiness(tau) {
+  const t = taggedValue(tau);
+  if (!Number.isFinite(t) || t <= 0) return 12;
+  const logt = Math.log10(t);
+  let dust = 8 + ((logt + 8) / 9) * 90;
+  if (dust < 0) dust = 0;
+  if (dust > 100) dust = 100;
+  return dust;
+}
+
+function tauToCountShare(tau) {
+  const t = taggedValue(tau);
+  if (!Number.isFinite(t) || t <= 0) return 0.01;
+  const logt = Math.log10(Math.max(t, 1e-8));
+  let share = 0.008 + ((logt + 8) / 9) * 0.09;
+  if (share < 0.006) share = 0.006;
+  if (share > 0.12) share = 0.12;
+  return share;
+}
+
+function bodyById(system, id) {
+  return ((system && system.bodies) || []).find(function (item) { return item && item.id === id; }) || null;
+}
+
+export function cueBallRingSource(system) {
+  const stored = system && system.rings_belts && system.rings_belts.cue_ball_ring_source;
+  if (stored) return String(stored);
+  const cue = bodyById(system, 'tc7');
+  if (cue && cue.ring_system && Array.isArray(cue.ring_system.bands) && cue.ring_system.bands.length) {
+    return 'data-belt';
+  }
+  return 'solid';
+}
+
+export function solidRingForBody(system, bodyId) {
+  const body = bodyById(system, bodyId);
+  if (!body) return false;
+  const bands = body.ring_system && body.ring_system.bands;
+  if (Array.isArray(bands)) {
+    for (let i = 0; i < bands.length; i++) {
+      if (bands[i] && bands[i].draw !== false) return false;
+    }
+  }
+  return body.rings === true;
+}
+
+function bandInnerOuterKm(band) {
+  const center = taggedValue(band.r_center_km);
+  const width = taggedValue(band.width_km);
+  if (center != null && width != null && width > 0) {
+    return { innerKm: center - width / 2, outerKm: center + width / 2 };
+  }
+  return { innerKm: taggedValue(band.r_in_km), outerKm: taggedValue(band.r_out_km) };
+}
+
+export function planetRingsFromScene(system, scene) {
+  const list = [];
+  const sceneBodies = (scene && scene.bodies) || [];
+  ((system && system.bodies) || []).forEach(function (src) {
+    const ringSys = src.ring_system;
+    if (!ringSys || !Array.isArray(ringSys.bands)) return;
+    const sceneBody = sceneBodies.find(function (item) { return item && item.id === src.id; });
+    if (!sceneBody) return;
+    const planetKm = taggedValue(ringSys.planet_radius_km) || (src.physical && src.physical.radius_km);
+    const display = sceneBody.radius;
+    ringSys.bands.forEach(function (band, index) {
+      if (!band || band.draw === false) return;
+      const name = band.name == null ? '' : String(band.name);
+      if (/gap/i.test(name) || name === 'phoebe_like') return;
+      const km = bandInnerOuterKm(band);
+      if (!(km.innerKm > 0) || !(km.outerKm > km.innerKm)) return;
+      let innerR = ringKmToScene(km.innerKm, planetKm, display);
+      let outerR = ringKmToScene(km.outerKm, planetKm, display);
+      if (outerR < innerR) {
+        const swap = innerR;
+        innerR = outerR;
+        outerR = swap;
+      }
+      if (outerR - innerR < 0.004) {
+        const mid = (innerR + outerR) / 2;
+        innerR = mid - 0.002;
+        outerR = mid + 0.002;
+      }
+      const thickness = Math.max(display * 0.025, 0.006);
+      list.push({
+        id: src.id + '-' + name,
+        name: (src.name || src.id) + ' ' + name,
+        parentId: src.id,
+        follow: 'planet',
+        center: {
+          x: sceneBody.position.x,
+          y: sceneBody.position.y,
+          z: sceneBody.position.z
+        },
+        innerRadius: innerR,
+        outerRadius: outerR,
+        thickness: thickness,
+        inclination: 0,
+        seed: SKY_SEED + 200 + index + (src.id === 'tc6' ? 0 : src.id === 'tc7' ? 20 : 40),
+        density: DENSITY_DEFAULT,
+        dustiness: tauToDustiness(band.tau),
+        countShare: tauToCountShare(band.tau),
+        drawSolid: false
+      });
+    });
   });
   return list;
 }

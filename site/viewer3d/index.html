@@ -32,7 +32,7 @@
   </div>
   <nav>
     <a href="../">Home</a>
-    <a href="../viewer/">SVG viewer</a>
+    <a href="../viewer/?view=svg">SVG viewer</a>
     <a href="./" aria-current="page">3D view</a>
     <a href="../manual/">Build a system</a>
     <a id="star-map" href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
@@ -41,31 +41,27 @@
 </header>
 <main class="viewer-main">
   <div class="dock">
-    <p id="crumbs">
-      <button type="button" id="crumb-system" data-frame="system">Tau Ceti</button>
-      <span aria-hidden="true">/</span>
-      <button type="button" id="crumb-focus" data-frame="tc5">Kakakiko</button>
-    </p>
-    <span id="zoom-note">Zoom: wheel</span>
-    <label>Elevation <input id="elev" type="range" min="15" max="75" value="20"> <span id="elev-readout">20°</span></label>
-    <button type="button" id="distance-mode">Schematic</button>
-    <label>Theme
-      <select id="scene-theme" aria-label="Scene theme">
-        <option value="empire">empire</option>
-        <option value="mardat">mardat</option>
-      </select>
-    </label>
-    <details class="belt-controls" open>
-      <summary>The Sombrero</summary>
-      <label>Density <input id="belt-b1-density" type="range" min="0" max="4" step="1" value="2" aria-label="The Sombrero Density"> <span id="belt-b1-density-readout">4200</span></label>
-      <label>Dustiness <input id="belt-b1-dustiness" type="range" min="0" max="100" step="1" value="40" aria-label="The Sombrero Dustiness"> <span id="belt-b1-dustiness-readout">40</span></label>
+    <div class="dock-row">
+      <p id="crumbs">
+        <button type="button" id="crumb-system" data-frame="system">Tau Ceti</button>
+        <span aria-hidden="true">/</span>
+        <button type="button" id="crumb-focus" data-frame="tc5">Kakakiko</button>
+      </p>
+      <span id="zoom-note">Zoom: wheel</span>
+      <label>Elevation <input id="elev" type="range" min="15" max="75" value="20"> <span id="elev-readout">20°</span></label>
+      <label>Theme
+        <select id="scene-theme" aria-label="Scene theme">
+          <option value="empire">empire</option>
+          <option value="mardat">mardat</option>
+        </select>
+      </label>
+      <button type="button" id="time-play">Time ×1, paused</button>
+      <button type="button" id="resource-toggle">SVG view</button>
+    </div>
+    <details id="lore-settings" class="lore-settings">
+      <summary>Lore based settings</summary>
+      <div id="lore-settings-body"></div>
     </details>
-    <details class="belt-controls" open>
-      <summary>Outer Wall</summary>
-      <label>Density <input id="belt-b2-density" type="range" min="0" max="4" step="1" value="2" aria-label="Outer Wall Density"> <span id="belt-b2-density-readout">2800</span></label>
-      <label>Dustiness <input id="belt-b2-dustiness" type="range" min="0" max="100" step="1" value="40" aria-label="Outer Wall Dustiness"> <span id="belt-b2-dustiness-readout">40</span></label>
-    </details>
-    <button type="button" id="time-play">Time ×1, paused</button>
     <p id="readout" aria-live="polite"></p>
   </div>
   <p id="load-status"></p>

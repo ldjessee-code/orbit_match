@@ -1,0 +1,43 @@
+{
+  "starroute_handoff": "1",
+  "kind": "system_handoff",
+  "star_key": "gaia:2452378776434477184",
+  "gaia_source_id": "2452378776434477184",
+  "hyg_id": "8087",
+  "hip": "8102",
+  "hd": "10700",
+  "hostname": "tau Cet",
+  "name": "Tau Ceti",
+  "ra_deg": 26.00905506,
+  "dec_deg": -15.9336802,
+  "dist_pc": 3.652171,
+  "x": 3.156191,
+  "y": 1.539995,
+  "z": -1.00261,
+  "mag": 3.3003998,
+  "bp_rp": 1.0512211,
+  "ci": 0.727,
+  "spect": "G8V",
+  "has_known_exoplanets": true,
+  "exoplanet_count": 3,
+  "tier": "gate_candidate",
+  "turquenish_system": "Turquenish",
+  "system_file": "tau-ceti.system.json",
+  "belts": [
+    {
+      "id": "b1",
+      "name": "The Sombrero",
+      "kind": "belt",
+      "a_inner_au": 1.1,
+      "a_outer_au": 1.6
+    },
+    {
+      "id": "b2",
+      "name": "Outer Wall",
+      "kind": "belt",
+      "a_inner_au": 10,
+      "a_outer_au": 52
+    }
+  ],
+  "rings": []
+}

@@ -121,7 +121,7 @@ const copied = {
   'bodies.b1.orbit.a_outer_au': 1.6,
   'bodies.b2.name': 'Outer Wall',
   'bodies.b2.orbit.a_inner_au': 10,
-  'bodies.b2.orbit.a_outer_au': 50
+  'bodies.b2.orbit.a_outer_au': 52
 };
 
 test('version 1 nested moon migrates to a flat body', async function () {

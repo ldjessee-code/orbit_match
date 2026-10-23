@@ -1,6 +1,15 @@
-import { loadSystem, loadView } from '../js/schema.js';
+import { loadView } from '../js/schema.js';
 import { cardLinks, VIEWER_SYSTEM_ID } from '../js/builder-link.js';
 import { applyShell } from '../js/shell.js';
+import { isHandoff, isLoreSystem, resolveSystem, safeSystemFile } from '../js/system-source.js';
+import {
+  collectBrowserSignals,
+  decideViewer,
+  readResourceStorage,
+  resourceDestination,
+  writeResourceStorage
+} from '../js/low-resource.js';
+import { loreSettingsFromSystem, loreSettingsMarkup } from './lore-settings.js';
 import { polarLimits, cameraPose, clampElevation } from './frame.js';
 import {
   TAU_CETI_LIGHT_K,
@@ -36,15 +45,27 @@ import {
   writeBeltColors,
   starfieldSpec,
   starfieldRgba,
-  backgroundRecord
+  backgroundRecord,
+  skyReference
 } from './sky.js';
 import {
   ringBeltsFromBands,
   ringPointCount,
   updateRingBeltFrame,
   withDensity,
-  withDustiness
+  withDustiness,
+  createRingBelt,
+  planetRingsFromScene,
+  solidRingForBody
 } from './ring-belt.js';
+import {
+  modelFileForBody,
+  modelMountPlan,
+  defaultLayerState,
+  setLayerVisible,
+  layerVisibleForNode,
+  isGlbRingNode
+} from './body-models.js';
 
 let loadedSystem = null;
 let loadedView = null;
@@ -70,15 +91,19 @@ let keyAim = null;
 let sceneTransfers = [];
 let cardSlots = [];
 let transferHits = [];
-const beltControl = {
-  b1: { density: DENSITY_DEFAULT, dustiness: DUSTINESS_DEFAULT },
-  b2: { density: DENSITY_DEFAULT, dustiness: DUSTINESS_DEFAULT }
-};
+const beltControl = {};
 let ringState = [];
 let dustClouds = [];
 let sceneRoot = null;
 let starfieldTex = null;
+let equirectTex = null;
+let equirectUrl = '';
+let dataLayers = [];
+let loreBound = false;
 let dustSprite = null;
+let BodyGLTFLoader = null;
+let modelGeneration = 0;
+let layerState = defaultLayerState();
 
 function showFallback() {
   const el = document.getElementById('fallback');
@@ -556,10 +581,14 @@ function placeDustCloud(THREE, root, belt) {
   dustClouds.push(cloud);
 }
 
-function mountDustBelts(THREE, root, belts) {
+function mountDustBelts(THREE, root, belts, sceneData) {
   releaseDustClouds();
   const bands = dustBands(belts);
   ringState = ringBeltsFromBands(bands, beltControl);
+  const planetConfigs = planetRingsFromScene(loadedSystem, sceneData || { bodies: [] });
+  for (let p = 0; p < planetConfigs.length; p++) {
+    ringState.push(createRingBelt(planetConfigs[p]));
+  }
   for (let i = 0; i < ringState.length; i++) {
     const belt = ringState[i];
     writeBeltReadout(belt);
@@ -574,8 +603,7 @@ function mountDustBelts(THREE, root, belts) {
     dustClouds.push(cloud);
   }
   if (!ringState.length) {
-    writeSettingsReadout('b1');
-    writeSettingsReadout('b2');
+    Object.keys(beltControl).forEach(writeSettingsReadout);
   }
 }
 
@@ -661,6 +689,158 @@ function syncPlanetRings() {
   }
 }
 
+function findBodyHost(root, id) {
+  let found = null;
+  if (!root || !id) return null;
+  root.traverse(function (child) {
+    if (found || !child.isMesh) return;
+    if (child.userData && child.userData.id === id) found = child;
+  });
+  return found;
+}
+
+function syncKakakikoLayers(root) {
+  if (!root) return;
+  root.traverse(function (child) {
+    const visible = layerVisibleForNode(child.name, layerState, dataLayers);
+    if (visible === null) return;
+    child.visible = visible;
+  });
+}
+
+function mountFromPlan(host, gltf, plan) {
+  if (!host || !plan || plan.fallback || !gltf || !gltf.scene) return;
+  const model = gltf.scene;
+  model.scale.setScalar(plan.scale);
+  model.traverse(function (child) {
+    if (isGlbRingNode(child.name)) {
+      child.visible = false;
+      return;
+    }
+    const visible = layerVisibleForNode(child.name, layerState, dataLayers);
+    if (visible !== null) child.visible = visible;
+  });
+  host.add(model);
+  host.userData.modelFallback = false;
+  if (plan.hideSphere && host.material) {
+    host.material.transparent = true;
+    host.material.opacity = 0;
+    host.material.depthWrite = false;
+    host.material.colorWrite = false;
+    host.material.needsUpdate = true;
+  }
+}
+
+function scheduleBodyModels(root, data) {
+  const generation = ++modelGeneration;
+  if (!BodyGLTFLoader || !root || !data) return;
+  const loader = new BodyGLTFLoader();
+  const jobs = [];
+  if (data.star) jobs.push({ id: 'star', radius: data.star.radius });
+  (data.bodies || []).forEach(function (body) {
+    jobs.push({ id: body.id, radius: body.radius });
+  });
+  jobs.forEach(function (job) {
+    const file = modelFileForBody(job.id, loadedSystem);
+    if (!file) return;
+    loader.loadAsync(file).then(function (gltf) {
+      if (generation !== modelGeneration) {
+        disposeObject(gltf.scene);
+        return;
+      }
+      const host = findBodyHost(root, job.id);
+      const plan = modelMountPlan(host ? { ok: true } : { ok: false }, job.id, job.radius, file);
+      if (!host || plan.fallback) {
+        if (gltf.scene) disposeObject(gltf.scene);
+        if (host) host.userData.modelFallback = true;
+        return;
+      }
+      mountFromPlan(host, gltf, plan);
+    }).catch(function () {
+      if (generation !== modelGeneration) return;
+      const host = findBodyHost(root, job.id);
+      const plan = modelMountPlan({ ok: false }, job.id, job.radius, file);
+      if (host && plan.fallback) host.userData.modelFallback = true;
+    });
+  });
+}
+
+function layersFromSystem(system) {
+  const list = [];
+  ((system && system.bodies) || []).forEach(function (body) {
+    (body.layers || []).forEach(function (layer) {
+      if (!layer || layer.key == null) return;
+      list.push({
+        key: String(layer.key),
+        node: layer.node == null ? '' : String(layer.node),
+        nodeName: layer.node == null ? '' : String(layer.node),
+        default: layer.default,
+        defaultVisible: layer.default === false ? false : layer.defaultVisible !== false
+      });
+    });
+  });
+  return list;
+}
+
+function fillBeltControl(system) {
+  Object.keys(beltControl).forEach(function (key) { delete beltControl[key]; });
+  loreSettingsFromSystem(system).belts.forEach(function (belt) {
+    beltControl[belt.id] = { density: belt.density, dustiness: belt.dustiness };
+  });
+}
+
+function bindLoreSettings(THREE, root) {
+  const host = document.getElementById('lore-settings-body');
+  if (!host || !loadedSystem) return;
+  const plan = loreSettingsFromSystem(loadedSystem);
+  host.innerHTML = loreSettingsMarkup(plan);
+  if (loreBound) return;
+  loreBound = true;
+  host.addEventListener('input', function (event) {
+    const el = event.target;
+    if (!el || !el.getAttribute) return;
+    const densityId = el.getAttribute('data-belt-density');
+    const dustId = el.getAttribute('data-belt-dustiness');
+    if (densityId && beltControl[densityId]) {
+      const value = Number(el.value);
+      beltControl[densityId].density = Number.isFinite(value) ? value : DENSITY_DEFAULT;
+      refreshBeltDensity(THREE, root, densityId);
+    }
+    if (dustId && beltControl[dustId]) {
+      const value = Number(el.value);
+      beltControl[dustId].dustiness = Number.isFinite(value) ? value : DUSTINESS_DEFAULT;
+      refreshBeltDustiness(dustId);
+    }
+  });
+  host.addEventListener('change', function (event) {
+    const el = event.target;
+    if (!el || !el.getAttribute || el.getAttribute('data-layer-key') == null) return;
+    layerState = setLayerVisible(layerState, el.getAttribute('data-layer-key'), el.checked, dataLayers);
+    if (sceneRoot) syncKakakikoLayers(sceneRoot);
+  });
+}
+
+async function loadRequestedSystem() {
+  const params = new URLSearchParams(location.search);
+  const requested = params.get('system');
+  let loreName = 'tau-ceti.system.json';
+  if (requested) {
+    const withSuffix = /\.system\.json$/i.test(requested) ? requested : requested + '.system.json';
+    const safe = safeSystemFile(withSuffix);
+    if (!safe) throw new Error('system name is not allowed');
+    loreName = safe;
+  }
+  const handoffName = loreName.replace(/\.system\.json$/i, '.handoff.json');
+  let lore = null;
+  let handoff = null;
+  try { lore = await fetchJson('../data/' + loreName); } catch (err) { lore = null; }
+  try { handoff = await fetchJson('../data/' + handoffName); } catch (err) { handoff = null; }
+  if (lore && !isLoreSystem(lore)) lore = null;
+  if (handoff && !isHandoff(handoff)) handoff = null;
+  if (!lore && !handoff) throw new Error('system file missing');
+  return resolveSystem({ lore: lore, handoff: handoff });
+}
+
 function rebuild(THREE, root, resetCamera) {
   dustClouds = [];
   transferHits = [];
@@ -675,6 +855,7 @@ function rebuild(THREE, root, resetCamera) {
   const chrome = themeChrome(data.theme);
   renderer.setClearColor(chrome.space.base);
   scene.background = ensureStarfield(THREE);
+  applySystemSky(THREE);
   stage.style.background = chrome.space.base;
   const rootStyle = document.documentElement;
   rootStyle.style.setProperty('--viewer3d-panel', chrome.panel);
@@ -720,7 +901,7 @@ function rebuild(THREE, root, resetCamera) {
     if (typeof body.a_au === 'number') record.a_au = body.a_au;
     else if (typeof body.a_km === 'number') record.a_km = body.a_km;
     tagMesh(mesh, body.id, record, body.position);
-    if (body.rings) {
+    if (solidRingForBody(loadedSystem, body.id)) {
       const ring = new THREE.Mesh(
         new THREE.RingGeometry(body.radius * 1.35, body.radius * 1.7, 64),
         new THREE.MeshStandardMaterial({ color: body.color, roughness: 1, metalness: 0, side: THREE.DoubleSide })
@@ -743,7 +924,7 @@ function rebuild(THREE, root, resetCamera) {
   data.belts.forEach(function (belt) {
     root.add(lineGeom(THREE, belt.points, belt.color || 0xd8c9a3, true));
   });
-  mountDustBelts(THREE, root, data.belts || []);
+  mountDustBelts(THREE, root, data.belts || [], data);
   data.transfers.forEach(function (hop) {
     const record = transferPickRecord(hop);
     const line = lineGeom(THREE, hop.points, hop.color || 0x6dffc8, false);
@@ -762,11 +943,10 @@ function rebuild(THREE, root, resetCamera) {
     root.add(lineGeom(THREE, circlePoints(data.habitable.innerR), 0x8ff0bf, true));
     root.add(lineGeom(THREE, circlePoints(data.habitable.outerR), 0x8ff0bf, true));
   }
+  scheduleBodyModels(root, data);
   paintLegend(data);
   syncLabels(data);
   paintCrumbs();
-  const distanceButton = document.getElementById('distance-mode');
-  if (distanceButton) distanceButton.textContent = modeLabel(session.distance_mode);
   if (resetCamera && data.camera) {
     camera.up.set(0, 1, 0);
     camera.position.set(data.camera.x, data.camera.y, data.camera.z);
@@ -774,6 +954,41 @@ function rebuild(THREE, root, resetCamera) {
     camera.lookAt(0, 0, 0);
     controls.update();
   }
+}
+
+function applyBackgroundRotation(THREE, rotation) {
+  const rot = rotation || { x: 0, y: 0, z: 0 };
+  if (!scene.backgroundRotation) scene.backgroundRotation = new THREE.Euler(rot.x, rot.y, rot.z, 'XYZ');
+  else scene.backgroundRotation.set(rot.x, rot.y, rot.z, 'XYZ');
+}
+
+function applySystemSky(THREE) {
+  const plan = skyReference(loadedSystem);
+  const procedural = ensureStarfield(THREE);
+  scene.background = procedural;
+  applyBackgroundRotation(THREE, plan.rotation);
+  if (plan.mode !== 'equirect' || !plan.url) return;
+  if (equirectTex && equirectUrl === plan.url) {
+    scene.background = equirectTex;
+    return;
+  }
+  const url = plan.url;
+  const loader = new THREE.TextureLoader();
+  loader.load(url, function (tex) {
+    if (!loadedSystem || skyReference(loadedSystem).url !== url) {
+      tex.dispose();
+      return;
+    }
+    // Rudy README: EquirectangularReflectionMapping and sRGB. Leave the loader's vertical orientation alone.
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    equirectTex = tex;
+    equirectUrl = url;
+    if (scene) scene.background = tex;
+  }, undefined, function () {
+    if (scene) scene.background = ensureStarfield(THREE);
+  });
 }
 
 function aimKeyLight() {
@@ -795,12 +1010,12 @@ function tick() {
 }
 
 async function startViewer(THREE, OrbitControls, gl) {
-  const files = await Promise.all([
-    fetchJson('../data/tau-ceti.system.json'),
-    fetchJson('../data/tau-ceti.view.json')
-  ]);
-  loadedSystem = loadSystem(files[0]);
-  loadedView = loadView(files[1]);
+  const viewFile = await fetchJson('../data/tau-ceti.view.json');
+  loadedSystem = await loadRequestedSystem();
+  loadedView = loadView(viewFile);
+  dataLayers = layersFromSystem(loadedSystem);
+  layerState = dataLayers.length ? defaultLayerState(dataLayers) : defaultLayerState();
+  fillBeltControl(loadedSystem);
   session = initialSession(loadedView);
   themeName = loadedView.theme === 'mardat' ? 'mardat' : 'empire';
   const themeSelect = document.getElementById('scene-theme');
@@ -852,6 +1067,7 @@ async function startViewer(THREE, OrbitControls, gl) {
   raycaster.params.Line.threshold = TRANSFER_LINE_THRESHOLD;
   pointer = new THREE.Vector2();
   let pointerDown = null;
+  bindLoreSettings(THREE, root);
   rebuild(THREE, root, true);
   paintCards();
   window.addEventListener('resize', resize);
@@ -875,44 +1091,12 @@ async function startViewer(THREE, OrbitControls, gl) {
     if (applying) return;
     syncElevationFromCamera();
   });
-  const distanceButton = document.getElementById('distance-mode');
-  if (distanceButton) {
-    distanceButton.addEventListener('click', function () {
-      session.distance_mode = session.distance_mode === 'linear' ? 'schematic' : 'linear';
-      distanceButton.textContent = modeLabel(session.distance_mode);
-      rebuild(THREE, root, false);
-    });
-  }
   if (themeSelect) {
     themeSelect.addEventListener('change', function () {
       themeName = themeSelect.value === 'mardat' ? 'mardat' : 'empire';
       rebuild(THREE, root, false);
     });
   }
-  const sombreroDensity = document.getElementById('belt-b1-density');
-  const sombreroDust = document.getElementById('belt-b1-dustiness');
-  const wallDensity = document.getElementById('belt-b2-density');
-  const wallDust = document.getElementById('belt-b2-dustiness');
-  if (sombreroDensity) sombreroDensity.value = String(beltControl.b1.density);
-  if (wallDensity) wallDensity.value = String(beltControl.b2.density);
-  if (sombreroDust) sombreroDust.value = String(beltControl.b1.dustiness);
-  if (wallDust) wallDust.value = String(beltControl.b2.dustiness);
-  bindBeltRange(sombreroDensity, function (value) {
-    beltControl.b1.density = Number.isFinite(value) ? value : DENSITY_DEFAULT;
-    refreshBeltDensity(THREE, root, 'b1');
-  });
-  bindBeltRange(wallDensity, function (value) {
-    beltControl.b2.density = Number.isFinite(value) ? value : DENSITY_DEFAULT;
-    refreshBeltDensity(THREE, root, 'b2');
-  });
-  bindBeltRange(sombreroDust, function (value) {
-    beltControl.b1.dustiness = Number.isFinite(value) ? value : DUSTINESS_DEFAULT;
-    refreshBeltDustiness('b1');
-  });
-  bindBeltRange(wallDust, function (value) {
-    beltControl.b2.dustiness = Number.isFinite(value) ? value : DUSTINESS_DEFAULT;
-    refreshBeltDustiness('b2');
-  });
   const timeButton = document.getElementById('time-play');
   if (timeButton) {
     timeButton.addEventListener('click', function () {
@@ -1011,8 +1195,45 @@ async function startViewer(THREE, OrbitControls, gl) {
   }
 }
 
+function probeWebgl() {
+  const surface = document.createElement('canvas');
+  let gl = null;
+  try {
+    gl = surface.getContext('webgl2') || surface.getContext('webgl');
+  } catch (err) {
+    gl = null;
+  }
+  if (!gl) return { webgl: false, maxTextureSize: null };
+  const size = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  const lose = gl.getExtension && gl.getExtension('WEBGL_lose_context');
+  if (lose && lose.loseContext) lose.loseContext();
+  return { webgl: true, maxTextureSize: typeof size === 'number' ? size : null };
+}
+
+function bindResourceToggle() {
+  const button = document.getElementById('resource-toggle');
+  if (!button) return;
+  button.addEventListener('click', function () {
+    writeResourceStorage('svg');
+    const dest = resourceDestination('3d', { mode: 'svg' }, location.search);
+    if (dest) location.assign(dest);
+  });
+}
+
 async function boot() {
   if (typeof document === 'undefined') return;
+  const choice = decideViewer({
+    search: location.search,
+    stored: readResourceStorage(),
+    signals: collectBrowserSignals(),
+    probe: probeWebgl
+  });
+  const dest = resourceDestination('3d', choice, location.search);
+  if (dest) {
+    location.replace(dest);
+    return;
+  }
+  bindResourceToggle();
   applyShell(document);
   stage = document.getElementById('stage');
   canvas = stage ? stage.querySelector('canvas') : null;
@@ -1034,6 +1255,12 @@ async function boot() {
   } catch (err) {
     showFallback();
     return;
+  }
+  try {
+    const gltfMod = await import('three/addons/loaders/GLTFLoader.js');
+    BodyGLTFLoader = gltfMod.GLTFLoader || null;
+  } catch (err) {
+    BodyGLTFLoader = null;
   }
   try {
     await startViewer(THREE, OrbitControls, gl);

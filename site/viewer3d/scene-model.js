@@ -155,6 +155,63 @@ function sceneOrbitRadius(radial, aAu) {
   return Math.hypot(placed.x, placed.z);
 }
 
+function taggedNum(node) {
+  if (node == null || typeof node !== 'object') {
+    const n = Number(node);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof node.value === 'number' && Number.isFinite(node.value)) return node.value;
+  return null;
+}
+
+function beltFeaturesFromBody(body, radial) {
+  const struct = body && body.belt_structure;
+  if (!struct) return [];
+  const features = [];
+  (struct.gaps_au || []).forEach(function (item) {
+    const au = taggedNum(item);
+    if (!(au > 0)) return;
+    const halfAu = taggedNum(item.half_width_au) || 0.015;
+    const depth = taggedNum(item.depth);
+    const radius = sceneOrbitRadius(radial, au);
+    const edge = sceneOrbitRadius(radial, au + halfAu);
+    features.push({
+      type: 'gap',
+      au: au,
+      radius: radius,
+      halfWidth: Math.abs(edge - radius),
+      depth: depth == null ? 0.85 : depth
+    });
+  });
+  const clumps = struct.resonant_clumps_with_eight_ball_au || {};
+  ['3:2', '2:1'].forEach(function (key) {
+    const node = clumps[key];
+    if (!node || node.draw === false) return;
+    const au = taggedNum(node);
+    if (!(au > 0)) return;
+    const halfAu = taggedNum(node.half_width_au) || (key === '3:2' ? 0.35 : 0.45);
+    const gain = taggedNum(node.gain);
+    const radius = sceneOrbitRadius(radial, au);
+    const edge = sceneOrbitRadius(radial, au + halfAu);
+    const feat = {
+      type: 'clump',
+      au: au,
+      radius: radius,
+      halfWidth: Math.abs(edge - radius),
+      gain: gain == null ? 1.6 : gain
+    };
+    if (key === '3:2' && node.azimuthal) {
+      feat.azimuthal = {
+        n: taggedNum(node.azimuthal.n),
+        phase: taggedNum(node.azimuthal.phase),
+        gain: taggedNum(node.azimuthal.gain)
+      };
+    }
+    features.push(feat);
+  });
+  return features;
+}
+
 function visualRadius(body) {
   const earth = 6371;
   const physical = body.physical || {};
@@ -316,7 +373,10 @@ function buildSystem(system, view, options) {
         innerR: radial(inner),
         outerR: radial(outer),
         color: (body.display && body.display.color) || '#d8c9a3',
-        points: circleAt(mid)
+        density: body.display ? body.display.density : undefined,
+        dustiness: body.display ? body.display.dustiness : undefined,
+        points: circleAt(mid),
+        features: beltFeaturesFromBody(body, radial)
       });
     });
   }

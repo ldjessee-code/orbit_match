@@ -1,0 +1,29 @@
+{
+  "orbit_match": 2,
+  "kind": "system",
+  "note": "Made-up test fixture. Not Turquenish and not Tau Ceti. The numbers are not lore.",
+  "epoch": "",
+  "reference_direction": {
+    "label": "toward the vernal point / arbitrary",
+    "deg": 0
+  },
+  "star": {
+    "hostname": "Made Up",
+    "name": "Made Up",
+    "mass_solar": 1
+  },
+  "bodies": [
+    {
+      "id": "demo",
+      "name": "Demo",
+      "kind": "planet",
+      "orbit": {
+        "a_au": 1,
+        "e": 0,
+        "period_days": 365.25,
+        "position_angle_deg": 90,
+        "perihelion_longitude_deg": 10
+      }
+    }
+  ]
+}

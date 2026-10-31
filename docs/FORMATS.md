@@ -14,7 +14,9 @@ Units:
 - A moon or a station distance is `orbit.a_km` from `parent`. One field is not both AU and kilometres.
 - A belt uses `orbit.a_inner_au` and `orbit.a_outer_au`.
 - Mass is at most one of `mass_earth`, `mass_kg`, or `mass_solar`.
-- Angles are degrees. Time is days from `epoch.t0_days`.
+- Angles are degrees. Time is days from the epoch. An older file stores that epoch as `{ t0_days, label, canon }`. A new file may store `epoch` as text. An empty string means TBD, which is day 0 of the program clock. The text is a label. The page does not turn an ISO date into a day count.
+- `reference_direction` is `{ label, deg }`. `deg` is the shared 0° axis in the system plane. The default label is `toward the vernal point / arbitrary` and the default `deg` is 0. 360 is stored as 0. Angles increase in the prograde direction.
+- Each body may store `orbit.position_angle_deg` (true longitude at the epoch, from that axis) and `orbit.perihelion_longitude_deg` (longitude of perihelion). Both are 0 to 359.99. A body without them keeps the old placement: a heliocentric body with no `mean_anomaly_deg` is spaced by its index, a Lagrange body sits 60° ahead of its partner, and a child with `angle_deg` keeps that angle. A circular orbit still stores the perihelion angle. The position does not use it. The builder still saves version 1. The loader moves those two angles onto `orbit`.
 
 Star luminosity may be `lum_solar` (linear) or `lum_log` (log10). The loader records which key it saw. Habitable-zone edges are `hz_inner_au` and `hz_outer_au` when the setting gives them. Tau Ceti uses 0.68 and 1.22. A star without those fields still loads. The viewer may fall back to `0.95 √L` through `1.67 √L` and tag that band `est`.
 

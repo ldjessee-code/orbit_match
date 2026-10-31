@@ -12,6 +12,101 @@ function wrap(angle) {
   return ((angle % TAU) + TAU) % TAU;
 }
 
+function wrapDeg(deg) {
+  let full = ((deg % 360) + 360) % 360;
+  if (Object.is(full, -0) || full === 360) full = 0;
+  return full;
+}
+
+function finishAngle(parsed) {
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 360) {
+    return { ok: false, empty: false, value: null, error: 'Enter a number from 0 to 360.' };
+  }
+  let rounded = Math.round(parsed * 100) / 100;
+  if (parsed === 360 || rounded >= 360) rounded = 0;
+  if (Object.is(rounded, -0)) rounded = 0;
+  return { ok: true, empty: false, value: rounded };
+}
+
+// Degrees in the system plane. 360 is the same direction as 0. Text is rejected.
+export function parseAngleDeg(value) {
+  if (value == null) return { ok: true, empty: true, value: null };
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      return { ok: false, empty: false, value: null, error: 'Enter a number from 0 to 360.' };
+    }
+    return finishAngle(value);
+  }
+  const text = String(value).trim();
+  if (text === '') return { ok: true, empty: true, value: null };
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(text)) {
+    return { ok: false, empty: false, value: null, error: 'Enter a number from 0 to 360.' };
+  }
+  return finishAngle(Number(text));
+}
+
+// Uniform over 0.00 to 359.99. rng returns a number in [0, 1). 1 still stays below 360.
+export function randomAngleDeg(rng) {
+  const next = typeof rng === 'function' ? rng : Math.random;
+  let roll = Number(next());
+  if (!Number.isFinite(roll)) throw new Error('rng did not return a number');
+  if (roll < 0) roll = 0;
+  if (roll >= 1) return 359.99;
+  let index = Math.floor(roll * 36000);
+  const nearest = Math.round(roll * 36000);
+  if (nearest !== index && Math.abs(roll * 36000 - nearest) < 1e-6) index = nearest;
+  if (index < 0) index = 0;
+  if (index > 35999) index = 35999;
+  return index / 100;
+}
+
+function trueToEccentric(nu, e) {
+  const cosNu = Math.cos(nu);
+  const sinNu = Math.sin(nu);
+  const denom = 1 + e * cosNu;
+  const root = Math.sqrt(Math.max(0, 1 - e * e));
+  return Math.atan2((root * sinNu) / denom, (e + cosNu) / denom);
+}
+
+function eccentricToTrue(E, e) {
+  const cosE = Math.cos(E);
+  const sinE = Math.sin(E);
+  const denom = 1 - e * cosE;
+  const root = Math.sqrt(Math.max(0, 1 - e * e));
+  return Math.atan2((root * sinE) / denom, (cosE - e) / denom);
+}
+
+// True longitude at epoch is position_angle_deg. Perihelion longitude is the
+// same zero. tDays is days after that epoch. e = 0 ignores perihelion.
+export function positionFromAngles(orbit, tDays) {
+  const src = orbit || {};
+  const e = src.e > 0 ? src.e : 0;
+  let a = src.a;
+  if (a == null) a = src.a_au;
+  if (a == null) a = src.a_km;
+  const period = src.period_days;
+  const positionDeg = src.position_angle_deg || 0;
+  const periDeg = src.perihelion_longitude_deg || 0;
+  const refDeg = src.reference_deg || 0;
+  const t = tDays || 0;
+  const nu0 = ((positionDeg - periDeg) * Math.PI) / 180;
+  const E0 = e === 0 ? wrap(nu0) : trueToEccentric(nu0, e);
+  const M0 = e === 0 ? E0 : wrap(E0 - e * Math.sin(E0));
+  const w = (periDeg * Math.PI) / 180;
+  const span = period > 0 ? period : 1;
+  const spot = pos({ a: a, e: e, period_days: span, M0: M0, w: w }, period > 0 ? t : 0);
+  const motion = period > 0 ? (TAU * t) / period : 0;
+  const E = solveKepler(M0 + motion, e);
+  const nu = e === 0 ? wrap(E) : eccentricToTrue(E, e);
+  const trueLon = wrapDeg((nu * 180) / Math.PI + periDeg);
+  const rot = (refDeg * Math.PI) / 180;
+  const c = Math.cos(rot);
+  const s = Math.sin(rot);
+  const x = spot.x * c - spot.y * s;
+  const y = spot.x * s + spot.y * c;
+  return { x: x, y: y, true_longitude_deg: trueLon, radius: Math.hypot(x, y) };
+}
+
 export function solveKepler(meanAnomaly, eccentricity) {
   const e = eccentricity || 0;
   let M = wrap(meanAnomaly);
@@ -144,5 +239,15 @@ export function fusionMatched(depFn, tgtFn, t0Days, acc, budget, S) {
     at: at,
     dvUsed: solved.dvUsed,
     arrive: tgtFn(t0Days + T / DAY_S)
+  };
+}
+
+if (typeof window !== 'undefined') {
+  window.OrbitKepler = {
+    parseAngleDeg: parseAngleDeg,
+    randomAngleDeg: randomAngleDeg,
+    positionFromAngles: positionFromAngles,
+    solveKepler: solveKepler,
+    pos: pos
   };
 }

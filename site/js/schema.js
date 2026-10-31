@@ -1,4 +1,7 @@
+import { parseAngleDeg } from './kepler.js';
+
 const YEAR_DAYS = 365.25;
+const ANGLE_KEYS = ['position_angle_deg', 'perihelion_longitude_deg'];
 const ORBIT_NUMBERS = ['a_au', 'a_km', 'a_inner_au', 'a_outer_au', 'e', 'e_max', 'i_deg', 'period_days'];
 const PHYSICAL_NUMBERS = ['radius_km', 'mass_earth', 'mass_kg', 'mass_solar', 'surface_g', 'rotation_h', 'tilt_deg'];
 const STAR_NUMBERS = ['mass_solar', 'lum_solar', 'lum_log', 'teff_k', 'radius_solar', 'hz_inner_au', 'hz_outer_au', 'x_ly', 'y_ly', 'z_ly'];
@@ -84,6 +87,62 @@ function derivePeriod(body, massSolar) {
   orbit.period_days = YEAR_DAYS * Math.sqrt((orbit.a_au * orbit.a_au * orbit.a_au) / mass);
 }
 
+function takeAngle(orbit, key) {
+  if (!Object.prototype.hasOwnProperty.call(orbit, key)) return;
+  const raw = orbit[key];
+  if (raw == null || raw === '') {
+    delete orbit[key];
+    return;
+  }
+  const parsed = parseAngleDeg(raw);
+  if (!parsed.ok || parsed.empty) throw new Error(key + ' is not a valid angle');
+  orbit[key] = parsed.value;
+}
+
+function adoptAngles(body) {
+  const orbit = body.orbit;
+  for (const key of ANGLE_KEYS) {
+    const missing = orbit[key] == null || orbit[key] === '';
+    if (missing && body[key] != null && body[key] !== '') orbit[key] = body[key];
+    if (Object.prototype.hasOwnProperty.call(body, key)) delete body[key];
+    takeAngle(orbit, key);
+  }
+}
+
+function adoptReference(data) {
+  if (!Object.prototype.hasOwnProperty.call(data, 'reference_direction') || data.reference_direction == null) return;
+  const ref = data.reference_direction;
+  if (typeof ref === 'string') {
+    data.reference_direction = {
+      label: ref.trim() || 'toward the vernal point / arbitrary',
+      deg: 0
+    };
+    return;
+  }
+  if (typeof ref !== 'object' || Array.isArray(ref)) throw new Error('reference_direction is not valid');
+  const label = ref.label == null || String(ref.label).trim() === ''
+    ? 'toward the vernal point / arbitrary'
+    : String(ref.label);
+  let deg = 0;
+  if (ref.deg != null && ref.deg !== '') {
+    const parsed = parseAngleDeg(ref.deg);
+    if (!parsed.ok || parsed.empty) throw new Error('reference_direction.deg is not a valid angle');
+    deg = parsed.value;
+  }
+  data.reference_direction = { label: label, deg: deg };
+}
+
+function adoptEpoch(data) {
+  if (!Object.prototype.hasOwnProperty.call(data, 'epoch') || data.epoch == null) return;
+  if (typeof data.epoch === 'string') return;
+  if (typeof data.epoch === 'object' && !Array.isArray(data.epoch)) return;
+  if (typeof data.epoch === 'number' && Number.isFinite(data.epoch)) {
+    data.epoch = String(data.epoch);
+    return;
+  }
+  throw new Error('epoch is not valid');
+}
+
 function normalize(data) {
   data.orbit_match = 2;
   data.star = data.star && typeof data.star === 'object' ? data.star : {};
@@ -92,6 +151,8 @@ function normalize(data) {
   else if (data.star.lum_solar != null) data.luminosity_seen = 'lum_solar';
   else if (data.star.lum_log != null) data.luminosity_seen = 'lum_log';
   const mass = data.star.mass_solar;
+  adoptEpoch(data);
+  adoptReference(data);
   data.skipped = [];
   data.bodies = Array.isArray(data.bodies) ? data.bodies : [];
   for (const body of data.bodies) {
@@ -102,6 +163,7 @@ function normalize(data) {
       const angle = num(body.angle_deg);
       if (angle != null) body.angle_deg = angle;
     }
+    adoptAngles(body);
     derivePeriod(body, mass);
     if (!hasDistance(body.orbit)) {
       data.skipped.push({ id: body.id == null ? null : body.id, reason: 'no distance' });

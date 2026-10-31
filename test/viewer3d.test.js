@@ -970,10 +970,14 @@ test('elapsed_days moves the system view and the submap', async function () {
   [svgClient, threeClient].forEach(function (client) {
     assert.match(client, /viewer-state\.js/);
     assert.match(client, /viewAtClock/);
-    assert.match(client, /stepElapsed/);
-    assert.match(client, /writeViewerState/);
-    assert.match(client, /addEventListener\('storage'/);
+    assert.match(client, /stepElapsed|playback\.js/);
+    assert.match(client, /writeViewerState|playback\.js/);
+    assert.match(client, /addEventListener\('storage'|playback\.js/);
   });
+  const playbackJs = read('site/js/playback.js');
+  assert.match(playbackJs, /stepElapsed/);
+  assert.match(playbackJs, /writeViewerState/);
+  assert.match(playbackJs, /addEventListener\('storage'/);
   assert.doesNotMatch(threeClient, /Time ×1, paused/);
   assert.equal(schema.loadView(readJson('site/data/tau-ceti.view.json')).epoch_days, 0);
 });

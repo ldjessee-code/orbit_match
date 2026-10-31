@@ -19,8 +19,14 @@ main.viewer-main {
 }
 
 .dock button,
-.dock input {
+.dock input,
+.dock select {
   font: inherit;
+}
+
+.dock button[aria-pressed="true"] {
+  border-color: var(--accent);
+  font-weight: 700;
 }
 
 #crumbs button[aria-current="true"] {

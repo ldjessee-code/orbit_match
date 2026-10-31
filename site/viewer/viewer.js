@@ -11,19 +11,23 @@ import {
   writeResourceStorage
 } from '../js/low-resource.js';
 import {
-  VIEWER_STATE_KEY,
   readViewerState,
-  stepElapsed,
   systemIdFromSearch,
-  viewAtClock,
-  writeViewerState
+  viewAtClock
 } from '../js/viewer-state.js';
+import { mountPlaybackDock } from '../js/playback.js';
 
-const sky = document.getElementById('sky');
-const status = document.getElementById('load-status');
-const readout = document.getElementById('readout');
+export function bindTimeDock(env) {
+  return mountPlaybackDock(env);
+}
+
+const hasDom = typeof document !== 'undefined';
+const sky = hasDom ? document.getElementById('sky') : null;
+const status = hasDom ? document.getElementById('load-status') : null;
+const readout = hasDom ? document.getElementById('readout') : null;
 let frame = 'system';
 let bag = null;
+let playback = null;
 
 function fetchJson(url) {
   return fetch(url).then(function (response) {
@@ -34,7 +38,8 @@ function fetchJson(url) {
 
 function clockedView() {
   const search = typeof location === 'undefined' ? '' : location.search;
-  return viewAtClock(bag.view, bag.system, readViewerState(), systemIdFromSearch(search));
+  const state = playback && playback.viewerState ? playback.viewerState() : readViewerState();
+  return viewAtClock(bag.view, bag.system, state, systemIdFromSearch(search));
 }
 
 function paint() {
@@ -69,7 +74,10 @@ function paintCrumbs() {
   if (frame && frame !== 'system') {
     focusBody = (bag.system.bodies || []).find(function (body) { return body.id === frame; }) || null;
     if (!focusBody || !hasSubmap(bag.system, focusBody.id)) {
-      frame = 'system';
+      if (frame !== 'system') {
+        frame = 'system';
+        if (playback) playback.setClose(false);
+      }
       focusBody = null;
     }
   }
@@ -107,7 +115,7 @@ function toggleCallout(id) {
   paint();
 }
 
-sky.addEventListener('click', function (event) {
+if (sky) sky.addEventListener('click', function (event) {
   if (!bag) return;
   const hit = event.target.closest ? event.target.closest('[data-callout]') : null;
   if (hit && sky.contains(hit)) {
@@ -124,11 +132,12 @@ sky.addEventListener('click', function (event) {
 function showFrame(next) {
   if (next && next !== 'system' && (!bag || !hasSubmap(bag.system, next))) return;
   frame = next || 'system';
+  if (playback) playback.setClose(frame !== 'system');
   if (bag) bag.view.callouts = [];
   paint();
 }
 
-const crumbHost = document.getElementById('crumbs');
+const crumbHost = hasDom ? document.getElementById('crumbs') : null;
 if (crumbHost) {
   crumbHost.addEventListener('click', function (event) {
     const button = event.target.closest ? event.target.closest('button') : null;
@@ -137,7 +146,7 @@ if (crumbHost) {
   });
 }
 
-sky.addEventListener('dblclick', function (event) {
+if (sky) sky.addEventListener('dblclick', function (event) {
   if (!bag) return;
   const hit = event.target.closest ? event.target.closest('[data-callout]') : null;
   if (!hit || !sky.contains(hit)) return;
@@ -182,7 +191,7 @@ function stayOnSvg() {
   return false;
 }
 
-const resourceToggle = document.getElementById('resource-toggle');
+const resourceToggle = hasDom ? document.getElementById('resource-toggle') : null;
 if (resourceToggle) {
   resourceToggle.addEventListener('click', function () {
     writeResourceStorage('3d');
@@ -191,24 +200,33 @@ if (resourceToggle) {
   });
 }
 
-const timeDock = document.querySelector('.dock');
-if (timeDock) {
-  timeDock.addEventListener('click', function (event) {
-    const button = event.target.closest ? event.target.closest('button[data-days]') : null;
-    if (!button || !timeDock.contains(button) || !bag) return;
-    const days = Number(button.getAttribute('data-days'));
-    if (!Number.isFinite(days)) return;
-    const search = typeof location === 'undefined' ? '' : location.search;
-    writeViewerState(stepElapsed(readViewerState(), systemIdFromSearch(search), days));
-    paint();
-  });
-}
-
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', function (event) {
-    if (!event || event.key !== VIEWER_STATE_KEY) return;
-    paint();
-  });
+if (hasDom) {
+  const timeDock = document.querySelector('.dock');
+  if (timeDock) {
+    playback = bindTimeDock({
+      document: document,
+      window: window,
+      dock: timeDock,
+      storage: typeof localStorage === 'undefined' ? null : localStorage,
+      now: function () {
+        return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      },
+      requestFrame: function (fn) {
+        if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(fn);
+        return setTimeout(function () { fn(Date.now()); }, 16);
+      },
+      cancelFrame: function (id) {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(id);
+        clearTimeout(id);
+      },
+      onPaint: function () { paint(); },
+      systemId: function () {
+        const search = typeof location === 'undefined' ? '' : location.search;
+        return systemIdFromSearch(search);
+      },
+      isClose: function () { return frame !== 'system'; }
+    });
+  }
 }
 
 async function loadRequestedSystem() {
@@ -232,7 +250,7 @@ async function loadRequestedSystem() {
   return resolveSystem({ lore: lore, handoff: handoff });
 }
 
-if (stayOnSvg()) Promise.all([
+if (hasDom && stayOnSvg()) Promise.all([
   loadRequestedSystem(),
   fetchJson('../data/tau-ceti.view.json'),
   fetchJson('../themes/quiet.json'),

@@ -1,4 +1,4 @@
-import { pos, hohmannDays } from '../js/kepler.js';
+import { pos, hohmannDays, positionFromAngles } from '../js/kepler.js';
 import { toThree, clampElevation, cameraPose } from './frame.js';
 import { hohmannArc } from './transfer-arc.js';
 
@@ -89,6 +89,33 @@ function displayAngles(system) {
     angles.set(body.id, angles.get(body.lagrange.of) + Math.PI / 3);
   });
   return angles;
+}
+
+function referenceDeg(system) {
+  const ref = system && system.reference_direction;
+  if (!ref || typeof ref !== 'object' || Array.isArray(ref) || typeof ref.deg !== 'number') return 0;
+  return ref.deg;
+}
+
+function usesAngle(body) {
+  return !!(body && body.orbit && typeof body.orbit.position_angle_deg === 'number');
+}
+
+function spotAt(system, body, a, tDays, legacyRadians, periodFallback) {
+  const orbit = body.orbit || {};
+  const e = orbit.e || 0;
+  const period = orbit.period_days > 0 ? orbit.period_days : periodFallback;
+  if (usesAngle(body)) {
+    return positionFromAngles({
+      a: a,
+      e: e,
+      period_days: period,
+      position_angle_deg: orbit.position_angle_deg,
+      perihelion_longitude_deg: typeof orbit.perihelion_longitude_deg === 'number' ? orbit.perihelion_longitude_deg : 0,
+      reference_deg: referenceDeg(system)
+    }, tDays);
+  }
+  return pos({ a: a, e: e, period_days: period, M0: legacyRadians || 0, w: 0 }, tDays);
 }
 
 function distanceKnots(system) {
@@ -267,9 +294,14 @@ function bodyRecord(body, position, radius) {
 }
 
 function epochLabel(system) {
-  const epoch = system.epoch || {};
-  let label = epoch.label || 'T+0 (circa 1600 yrs hence)';
-  if (epoch.canon === 'placeholder' && label.indexOf('placeholder') < 0) label += ' (placeholder)';
+  const epoch = system.epoch;
+  if (typeof epoch === 'string') {
+    const text = epoch.trim();
+    return text ? text : 'TBD';
+  }
+  const obj = epoch || {};
+  let label = obj.label || 'T+0 (circa 1600 yrs hence)';
+  if (obj.canon === 'placeholder' && label.indexOf('placeholder') < 0) label += ' (placeholder)';
   return label;
 }
 
@@ -286,6 +318,16 @@ function distanceModeOf(view, options) {
 function sameDistance(a, b) {
   const scale = Math.max(Math.abs(a), Math.abs(b), 1e-12);
   return Math.abs(a - b) / scale <= 1e-6;
+}
+
+function sampleAngled(system, body, a, period, steps, mapPoint) {
+  const span = period > 0 ? period : 1;
+  const points = [];
+  for (let i = 0; i < steps; i++) {
+    const spot = spotAt(system, body, a, span * i / steps, 0, span);
+    points.push(mapPoint(spot.x, spot.y));
+  }
+  return points;
 }
 
 function sampleEllipse(a, e, period, m0, steps, mapPoint) {
@@ -331,13 +373,7 @@ function buildSystem(system, view, options) {
   const bodies = worlds.map(function (body) {
     const orbit = body.orbit;
     const angle = angles.get(body.id) || 0;
-    const spot = pos({
-      a: orbit.a_au,
-      e: orbit.e || 0,
-      period_days: orbit.period_days || 365.25,
-      M0: angle,
-      w: 0
-    }, tDays);
+    const spot = spotAt(system, body, orbit.a_au, tDays, angle, 365.25);
     return bodyRecord(body, placeAu(radial, spot.x, spot.y), visualRadius(body));
   });
   const orbits = [];
@@ -350,11 +386,16 @@ function buildSystem(system, view, options) {
       }
       seen.push(a);
       const angle = angles.get(body.id) || 0;
-      orbits.push({
-        id: body.id,
-        points: sampleEllipse(a, body.orbit.e || 0, body.orbit.period_days || 365.25, angle, 96, function (x, y) {
+      const points = usesAngle(body)
+        ? sampleAngled(system, body, a, body.orbit.period_days || 365.25, 96, function (x, y) {
           return placeAu(radial, x, y);
         })
+        : sampleEllipse(a, body.orbit.e || 0, body.orbit.period_days || 365.25, angle, 96, function (x, y) {
+          return placeAu(radial, x, y);
+        });
+      orbits.push({
+        id: body.id,
+        points: points
       });
     });
   }
@@ -464,7 +505,9 @@ function buildClose(system, view, options, focus) {
     if (typeof a !== 'number') return;
     const period = orbit.period_days || 1;
     const m0 = typeof body.angle_deg === 'number' ? (body.angle_deg * Math.PI) / 180 : (index / children.length) * TAU;
-    const spot = pos({ a: a, e: orbit.e || 0, period_days: period, M0: m0, w: 0 }, tDays);
+    const spot = usesAngle(body)
+      ? spotAt(system, body, a, tDays, 0, period)
+      : pos({ a: a, e: orbit.e || 0, period_days: period, M0: m0, w: 0 }, tDays);
     bodies.push(bodyRecord(body, toThree(spot.x * scale, spot.y * scale), visualRadius(body)));
   });
   const orbits = [];
@@ -480,11 +523,14 @@ function buildClose(system, view, options, focus) {
       seen.push(a);
       const period = orbit.period_days || 1;
       const m0 = typeof body.angle_deg === 'number' ? (body.angle_deg * Math.PI) / 180 : (index / children.length) * TAU;
+      const points = usesAngle(body)
+        ? sampleAngled(system, body, a, period, 96, function (x, y) { return toThree(x * scale, y * scale); })
+        : sampleEllipse(a, orbit.e || 0, period, m0, 96, function (x, y) {
+          return toThree(x * scale, y * scale);
+        });
       orbits.push({
         id: body.id,
-        points: sampleEllipse(a, orbit.e || 0, period, m0, 96, function (x, y) {
-          return toThree(x * scale, y * scale);
-        })
+        points: points
       });
     });
   }

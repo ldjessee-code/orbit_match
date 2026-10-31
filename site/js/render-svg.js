@@ -1,4 +1,4 @@
-import { pos, hohmannDays, fusionMatched, AU_M } from './kepler.js';
+import { pos, hohmannDays, fusionMatched, AU_M, positionFromAngles } from './kepler.js';
 
 const TAU = 2 * Math.PI;
 const W = 1600;
@@ -60,6 +60,37 @@ function displayAngles(system) {
     angles.set(body.id, angles.get(body.lagrange.of) + Math.PI / 3);
   });
   return angles;
+}
+
+function clockDays(view) {
+  return view && typeof view.epoch_days === 'number' ? view.epoch_days : 0;
+}
+
+function referenceDeg(system) {
+  const ref = system && system.reference_direction;
+  if (!ref || typeof ref !== 'object' || Array.isArray(ref) || typeof ref.deg !== 'number') return 0;
+  return ref.deg;
+}
+
+function usesAngle(body) {
+  return !!(body && body.orbit && typeof body.orbit.position_angle_deg === 'number');
+}
+
+function spotAt(system, body, a, tDays, legacyRadians) {
+  const orbit = body.orbit || {};
+  const e = orbit.e || 0;
+  const period = orbit.period_days > 0 ? orbit.period_days : 365.25;
+  if (usesAngle(body)) {
+    return positionFromAngles({
+      a: a,
+      e: e,
+      period_days: period,
+      position_angle_deg: orbit.position_angle_deg,
+      perihelion_longitude_deg: typeof orbit.perihelion_longitude_deg === 'number' ? orbit.perihelion_longitude_deg : 0,
+      reference_deg: referenceDeg(system)
+    }, tDays);
+  }
+  return pos({ a: a, e: e, period_days: period, M0: legacyRadians || 0, w: 0 }, tDays);
 }
 
 function schematicMap(distances, rIn, fit) {
@@ -170,17 +201,11 @@ function renderSystem(system, view, theme, style) {
       ring(parts, CX, CY, map(body.orbit.a_au), ratio, style.orbit, body.orbit.a_au, body.id);
     });
   }
-  if (layer(view, 'transfers')) transfer(parts, system, view, place, style, angles);
+  const tDays = clockDays(view);
+  if (layer(view, 'transfers')) transfer(parts, system, view, place, style, angles, tDays);
   const markers = heliocentric(system).map(function (body) {
     const angle = angles.get(body.id) || 0;
-    const e = body.orbit.e || 0;
-    const spot = pos({
-      a: body.orbit.a_au,
-      e: e,
-      period_days: body.orbit.period_days || 365.25,
-      M0: angle,
-      w: 0
-    }, 0);
+    const spot = spotAt(system, body, body.orbit.a_au, tDays, angle);
     const at = place(spot.x, spot.y);
     return { body: body, at: at, r: diskRadius(body) };
   }).sort(function (a, b) { return a.at.sy - b.at.sy; });
@@ -241,16 +266,21 @@ function renderClose(system, view, theme, style, focus) {
   }
   if (layer(view, 'orbits')) {
     children.filter(function (body) { return body.kind !== 'structure'; }).forEach(function (body) {
-      drawChildOrbit(parts, body, place, px, ratio, CX, CY, style);
+      drawChildOrbit(parts, body, place, px, ratio, CX, CY, style, system);
     });
   }
+  const tDays = clockDays(view);
   const marks = [];
   children.forEach(function (body) {
     const a = body.orbit.a_km || 0;
     const e = body.orbit.e || 0;
     let x = a;
     let y = 0;
-    if (typeof body.angle_deg === 'number') {
+    if (usesAngle(body)) {
+      const spot = spotAt(system, body, a, tDays, 0);
+      x = spot.x;
+      y = spot.y;
+    } else if (typeof body.angle_deg === 'number') {
       const ang = (body.angle_deg * Math.PI) / 180;
       x = a * Math.cos(ang);
       y = a * Math.sin(ang);
@@ -296,14 +326,16 @@ function renderClose(system, view, theme, style, focus) {
   return parts.join('\n');
 }
 
-function drawChildOrbit(parts, body, place, px, ratio, cx, cy, style) {
+function drawChildOrbit(parts, body, place, px, ratio, cx, cy, style, system) {
   const a = body.orbit.a_km || 0;
   const e = body.orbit.e || 0;
   if (e >= 0.05 && body.orbit.period_days) {
     const pts = [];
     const steps = 96;
     for (let i = 0; i <= steps; i++) {
-      const spot = pos({ a: a, e: e, period_days: body.orbit.period_days, M0: 0, w: 0 }, body.orbit.period_days * i / steps);
+      const spot = usesAngle(body)
+        ? spotAt(system, body, a, body.orbit.period_days * i / steps, 0)
+        : pos({ a: a, e: e, period_days: body.orbit.period_days, M0: 0, w: 0 }, body.orbit.period_days * i / steps);
       pts.push(place(spot.x, spot.y));
     }
     const d = polyline(pts);
@@ -404,7 +436,15 @@ function hash(text) {
   return ((h >>> 0) % 10000) / 10000;
 }
 
-function transfer(parts, system, view, place, style, angles) {
+function departureRadians(system, body, tDays, angles) {
+  if (usesAngle(body)) {
+    const spot = spotAt(system, body, body.orbit.a_au, tDays, 0);
+    return Math.atan2(spot.y, spot.x);
+  }
+  return angles.get(body.id) || 0;
+}
+
+function transfer(parts, system, view, place, style, angles, tDays) {
   const spec = view.transfer;
   if (!spec || !spec.from || !spec.to) return;
   const from = byId(system, spec.from);
@@ -412,7 +452,7 @@ function transfer(parts, system, view, place, style, angles) {
   if (!from || !to || !(from.orbit.a_au > 0) || !(to.orbit.a_au > 0)) return;
   const mass = system.star && system.star.mass_solar ? system.star.mass_solar : 1;
   const hop = hohmannDays(from.orbit.a_au, to.orbit.a_au, mass);
-  const ang = angles.get(from.id) || 0;
+  const ang = departureRadians(system, from, tDays, angles);
   const pts = [];
   for (let i = 0; i <= 80; i++) {
     const nu = (Math.PI * i) / 80;
@@ -422,7 +462,7 @@ function transfer(parts, system, view, place, style, angles) {
   const d = polyline(pts);
   parts.push('<path data-callout="transfer:hohmann" d="' + d + '" fill="none" stroke="transparent" stroke-width="12"/>');
   parts.push('<path data-role="hohmann" data-days="' + hop.days.toFixed(0) + '" d="' + d + '" fill="none" stroke="' + style.hohmann + '" stroke-width="1.5" stroke-dasharray="' + (style.hohmann_dash || '8 6') + '" pointer-events="none"/>');
-  const flown = fuse(from, to, ang, angles.get(to.id) || 0);
+  const flown = fuse(from, to, ang, departureRadians(system, to, tDays, angles), system);
   if (flown) {
     const burn = Math.max(1, Math.round(40 * flown.tb / flown.T));
     const all = sampleFusion(flown, place);
@@ -434,17 +474,23 @@ function transfer(parts, system, view, place, style, angles) {
   }
 }
 
-function fuse(from, to, fromAngle, toAngle) {
+function fuse(from, to, fromAngle, toAngle, system) {
   try {
-    const dep = xy(from, fromAngle);
-    const tgt = xy(to, toAngle);
+    const dep = xy(from, fromAngle, system);
+    const tgt = xy(to, toAngle, system);
     return fusionMatched(dep, tgt, 0, 0.01 * G0, 150000, AU_M);
   } catch (err) {
     return null;
   }
 }
 
-function xy(body, angle) {
+function xy(body, angle, system) {
+  if (usesAngle(body)) {
+    return function (t) {
+      const spot = spotAt(system, body, body.orbit.a_au, t, 0);
+      return [spot.x, spot.y];
+    };
+  }
   const orbit = {
     a: body.orbit.a_au,
     e: body.orbit.e || 0,

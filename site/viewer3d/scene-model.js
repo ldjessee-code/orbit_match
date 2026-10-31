@@ -69,6 +69,118 @@ function byId(system, id) {
   return (system.bodies || []).find(function (body) { return body.id === id; });
 }
 
+function taggedKm(node) {
+  if (node == null || typeof node !== 'object') {
+    const n = Number(node);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof node.value === 'number' && Number.isFinite(node.value)) return node.value;
+  if (typeof node.min === 'number' && typeof node.max === 'number' && node.min > 0 && node.max > 0) {
+    return Math.sqrt(node.min * node.max);
+  }
+  if (typeof node.min === 'number' && Number.isFinite(node.min)) return node.min;
+  if (typeof node.max === 'number' && Number.isFinite(node.max)) return node.max;
+  return null;
+}
+
+export function bandEdgesKm(band) {
+  if (!band || typeof band !== 'object') return { innerKm: null, outerKm: null };
+  const center = taggedKm(band.r_center_km);
+  const width = taggedKm(band.width_km);
+  if (center != null && width != null && width > 0) {
+    return { innerKm: center - width / 2, outerKm: center + width / 2 };
+  }
+  return { innerKm: taggedKm(band.r_in_km), outerKm: taggedKm(band.r_out_km) };
+}
+
+export function isDrawableBand(band) {
+  if (!band || band.draw === false) return false;
+  const name = band.name == null ? '' : String(band.name);
+  if (/gap/i.test(name) || name === 'phoebe_like') return false;
+  const km = bandEdgesKm(band);
+  return km.innerKm > 0 && km.outerKm > km.innerKm;
+}
+
+export function hasSubmap(system, id) {
+  const data = system || { bodies: [] };
+  const body = id && typeof id === 'object' ? id : byId(data, id);
+  if (!body || body.id == null) return false;
+  const children = (data.bodies || []).some(function (item) { return item && item.parent === body.id; });
+  if (children) return true;
+  const bands = body.ring_system && body.ring_system.bands;
+  return Array.isArray(bands) && bands.some(isDrawableBand);
+}
+
+export function angleIsMissing(body) {
+  if (!body || body.kind === 'belt') return false;
+  const orbit = body.orbit || {};
+  if (typeof orbit.position_angle_deg === 'number') return false;
+  if (typeof body.angle_deg === 'number') return false;
+  if (typeof orbit.mean_anomaly_deg === 'number') return false;
+  if (typeof orbit.a_au !== 'number' && typeof orbit.a_km !== 'number') return false;
+  return true;
+}
+
+function focusRadiusKm(focus) {
+  const physical = focus && focus.physical && focus.physical.radius_km;
+  if (typeof physical === 'number' && physical > 0) return physical;
+  const tagged = focus && focus.ring_system ? taggedKm(focus.ring_system.planet_radius_km) : null;
+  if (tagged > 0) return tagged;
+  return null;
+}
+
+function apoKm(orbit) {
+  if (!orbit || typeof orbit.a_km !== 'number' || !Number.isFinite(orbit.a_km) || !(orbit.a_km > 0)) return null;
+  const e = typeof orbit.e === 'number' && orbit.e > 0 ? orbit.e : 0;
+  return orbit.a_km * (1 + e);
+}
+
+export function moonletsKm(body) {
+  const list = body && body.ring_system && body.ring_system.moonlets;
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  list.forEach(function (moonlet, index) {
+    if (!moonlet || typeof moonlet !== 'object') return;
+    const a = taggedKm(moonlet.a_km);
+    if (!(a > 0)) return;
+    const name = moonlet.name == null || String(moonlet.name) === '' ? 'moonlet ' + (index + 1) : String(moonlet.name);
+    out.push({
+      id: String(body.id) + ':moonlet:' + index,
+      name: name,
+      a_km: a,
+      radius_km: taggedKm(moonlet.radius_km)
+    });
+  });
+  return out;
+}
+
+export function closeExtentKm(system, id) {
+  const data = system || { bodies: [] };
+  const focus = id && typeof id === 'object' ? id : byId(data, id);
+  if (!focus) return 1;
+  let maxKm = 0;
+  const radius = focusRadiusKm(focus);
+  if (radius > maxKm) maxKm = radius;
+  (data.bodies || []).forEach(function (body) {
+    if (!body || body.parent !== focus.id || body.kind === 'belt') return;
+    const apo = apoKm(body.orbit);
+    if (apo > maxKm) maxKm = apo;
+  });
+  const bands = focus.ring_system && focus.ring_system.bands;
+  if (Array.isArray(bands)) {
+    bands.forEach(function (band) {
+      if (!isDrawableBand(band)) return;
+      const km = bandEdgesKm(band);
+      if (km.outerKm > maxKm) maxKm = km.outerKm;
+    });
+  }
+  moonletsKm(focus).forEach(function (moonlet) {
+    if (moonlet.a_km > maxKm) maxKm = moonlet.a_km;
+  });
+  if (!(maxKm > 0)) return 1;
+  return maxKm;
+}
+
 function heliocentric(system) {
   return (system.bodies || []).filter(function (body) {
     return body.parent == null && body.kind !== 'belt' && body.orbit && typeof body.orbit.a_au === 'number' && Number.isFinite(body.orbit.a_au);
@@ -77,18 +189,27 @@ function heliocentric(system) {
   });
 }
 
-function displayAngles(system) {
+export function displayAngleMap(system) {
   const worlds = heliocentric(system);
   const angles = new Map();
-  worlds.forEach(function (body, index) {
-    const stored = body.orbit && body.orbit.mean_anomaly_deg;
-    angles.set(body.id, typeof stored === 'number' ? (stored * Math.PI) / 180 : (index / worlds.length) * TAU);
+  worlds.forEach(function (body) {
+    const orbit = body.orbit || {};
+    let rad = 0;
+    if (typeof orbit.position_angle_deg === 'number') rad = (orbit.position_angle_deg * Math.PI) / 180;
+    else if (typeof body.angle_deg === 'number') rad = (body.angle_deg * Math.PI) / 180;
+    else if (typeof orbit.mean_anomaly_deg === 'number') rad = (orbit.mean_anomaly_deg * Math.PI) / 180;
+    angles.set(body.id, rad);
   });
   worlds.forEach(function (body) {
+    if (usesAngle(body)) return;
     if (!body.lagrange || !body.lagrange.of || !angles.has(body.lagrange.of)) return;
     angles.set(body.id, angles.get(body.lagrange.of) + Math.PI / 3);
   });
   return angles;
+}
+
+function displayAngles(system) {
+  return displayAngleMap(system);
 }
 
 function referenceDeg(system) {
@@ -290,6 +411,12 @@ function bodyRecord(body, position, radius) {
   if (typeof orbit.a_au === 'number') record.trueLabel = auText(orbit.a_au);
   else if (typeof orbit.a_km === 'number') record.trueLabel = withCommas(orbit.a_km) + ' km';
   if (typeof orbit.a_km === 'number') record.a_km = orbit.a_km;
+  record.angle_missing = angleIsMissing(body);
+  return record;
+}
+
+function markSubmap(system, body, record) {
+  if (hasSubmap(system, body.id)) record.submap = true;
   return record;
 }
 
@@ -302,6 +429,10 @@ function epochLabel(system) {
   const obj = epoch || {};
   let label = obj.label || 'T+0 (circa 1600 yrs hence)';
   if (obj.canon === 'placeholder' && label.indexOf('placeholder') < 0) label += ' (placeholder)';
+  if (typeof obj.game_datetime === 'string') {
+    const when = obj.game_datetime.trim();
+    if (when) label += ' · ' + when;
+  }
   return label;
 }
 
@@ -374,7 +505,7 @@ function buildSystem(system, view, options) {
     const orbit = body.orbit;
     const angle = angles.get(body.id) || 0;
     const spot = spotAt(system, body, orbit.a_au, tDays, angle, 365.25);
-    return bodyRecord(body, placeAu(radial, spot.x, spot.y), visualRadius(body));
+    return markSubmap(system, body, bodyRecord(body, placeAu(radial, spot.x, spot.y), visualRadius(body)));
   });
   const orbits = [];
   if (layerOn(view, 'orbits')) {
@@ -484,36 +615,43 @@ function buildSystem(system, view, options) {
   };
 }
 
+function closeM0(body) {
+  if (body && typeof body.angle_deg === 'number') return (body.angle_deg * Math.PI) / 180;
+  const orbit = (body && body.orbit) || {};
+  if (typeof orbit.mean_anomaly_deg === 'number') return (orbit.mean_anomaly_deg * Math.PI) / 180;
+  return 0;
+}
+
+function closeSpot(system, body, a, tDays, period) {
+  if (usesAngle(body)) return spotAt(system, body, a, tDays, 0, period);
+  const orbit = body.orbit || {};
+  return pos({ a: a, e: orbit.e || 0, period_days: period, M0: closeM0(body), w: 0 }, tDays);
+}
+
 function buildClose(system, view, options, focus) {
   const mode = distanceModeOf(view, options);
   const children = (system.bodies || []).filter(function (body) {
-    return body.parent === focus.id;
+    return body && body.parent === focus.id && body.kind !== 'belt' && body.orbit && typeof body.orbit.a_km === 'number';
   }).slice().sort(function (a, b) {
     return (a.orbit.a_km || 0) - (b.orbit.a_km || 0) || String(a.id).localeCompare(String(b.id));
   });
-  let maxKm = 0;
-  children.forEach(function (body) {
-    if (body.orbit && typeof body.orbit.a_km === 'number' && body.orbit.a_km > maxKm) maxKm = body.orbit.a_km;
-  });
-  if (!(maxKm > 0)) maxKm = 1;
-  const scale = CLOSE_SPAN / maxKm;
+  const extentKm = closeExtentKm(system, focus);
+  const scale = CLOSE_SPAN / extentKm;
   const tDays = typeof view.epoch_days === 'number' ? view.epoch_days : 0;
-  const bodies = [bodyRecord(focus, { x: 0, y: 0, z: 0 }, 1.2)];
-  children.forEach(function (body, index) {
+  const focusKm = focusRadiusKm(focus);
+  const focusRadius = focusKm > 0 ? focusKm * scale : visualRadius(focus);
+  const bodies = [markSubmap(system, focus, bodyRecord(focus, { x: 0, y: 0, z: 0 }, focusRadius))];
+  children.forEach(function (body) {
     const orbit = body.orbit || {};
     const a = orbit.a_km;
-    if (typeof a !== 'number') return;
-    const period = orbit.period_days || 1;
-    const m0 = typeof body.angle_deg === 'number' ? (body.angle_deg * Math.PI) / 180 : (index / children.length) * TAU;
-    const spot = usesAngle(body)
-      ? spotAt(system, body, a, tDays, 0, period)
-      : pos({ a: a, e: orbit.e || 0, period_days: period, M0: m0, w: 0 }, tDays);
-    bodies.push(bodyRecord(body, toThree(spot.x * scale, spot.y * scale), visualRadius(body)));
+    const period = orbit.period_days > 0 ? orbit.period_days : 1;
+    const spot = closeSpot(system, body, a, tDays, period);
+    bodies.push(markSubmap(system, body, bodyRecord(body, toThree(spot.x * scale, spot.y * scale), visualRadius(body))));
   });
   const orbits = [];
   if (layerOn(view, 'orbits')) {
     const seen = [];
-    children.forEach(function (body, index) {
+    children.forEach(function (body) {
       const orbit = body.orbit || {};
       const a = orbit.a_km;
       if (typeof a !== 'number') return;
@@ -521,11 +659,10 @@ function buildClose(system, view, options, focus) {
         if (sameDistance(seen[i], a)) return;
       }
       seen.push(a);
-      const period = orbit.period_days || 1;
-      const m0 = typeof body.angle_deg === 'number' ? (body.angle_deg * Math.PI) / 180 : (index / children.length) * TAU;
+      const period = orbit.period_days > 0 ? orbit.period_days : 1;
       const points = usesAngle(body)
         ? sampleAngled(system, body, a, period, 96, function (x, y) { return toThree(x * scale, y * scale); })
-        : sampleEllipse(a, orbit.e || 0, period, m0, 96, function (x, y) {
+        : sampleEllipse(a, orbit.e || 0, period, closeM0(body), 96, function (x, y) {
           return toThree(x * scale, y * scale);
         });
       orbits.push({
@@ -534,6 +671,16 @@ function buildClose(system, view, options, focus) {
       });
     });
   }
+  const moonlets = moonletsKm(focus).map(function (moonlet) {
+    return {
+      id: moonlet.id,
+      name: moonlet.name,
+      a_km: moonlet.a_km,
+      radius_km: moonlet.radius_km,
+      position: toThree(moonlet.a_km * scale, 0),
+      angle_missing: true
+    };
+  });
   const chrome = themeChrome(view.theme);
   return {
     star: null,
@@ -548,6 +695,9 @@ function buildClose(system, view, options, focus) {
     distanceMode: mode,
     frame: focus.id,
     focusId: focus.id,
+    extentKm: extentKm,
+    closeSpan: CLOSE_SPAN,
+    moonlets: moonlets,
     theme: chrome.id,
     showLabels: layerOn(view, 'labels')
   };
@@ -814,6 +964,7 @@ export function infoLines(system, id) {
   if (typeof physical.radius_km === 'number') lines.push(String(physical.radius_km) + ' km radius');
   if (typeof physical.mass_earth === 'number') lines.push(String(physical.mass_earth) + ' Earth masses');
   if (typeof physical.surface_g === 'number') lines.push(String(physical.surface_g) + ' g');
+  if (angleIsMissing(body)) lines.push('Start angle is not set');
   return lines;
 }
 

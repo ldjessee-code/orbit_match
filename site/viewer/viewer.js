@@ -1,6 +1,7 @@
 import { loadView } from '../js/schema.js';
 import { isHandoff, isLoreSystem, resolveSystem, safeSystemFile } from '../js/system-source.js';
 import { renderSvg } from '../js/render-svg.js';
+import { hasSubmap } from '../viewer3d/scene-model.js';
 import { applyShell } from '../js/shell.js';
 import {
   collectBrowserSignals,
@@ -9,6 +10,14 @@ import {
   resourceDestination,
   writeResourceStorage
 } from '../js/low-resource.js';
+import {
+  VIEWER_STATE_KEY,
+  readViewerState,
+  stepElapsed,
+  systemIdFromSearch,
+  viewAtClock,
+  writeViewerState
+} from '../js/viewer-state.js';
 
 const sky = document.getElementById('sky');
 const status = document.getElementById('load-status');
@@ -23,10 +32,15 @@ function fetchJson(url) {
   });
 }
 
+function clockedView() {
+  const search = typeof location === 'undefined' ? '' : location.search;
+  return viewAtClock(bag.view, bag.system, readViewerState(), systemIdFromSearch(search));
+}
+
 function paint() {
   if (!bag) return;
   const style = bag.view.style === 'holo' ? bag.holo : bag.quiet;
-  sky.innerHTML = renderSvg(bag.system, bag.view, bag.empire, style, { frame: frame });
+  sky.innerHTML = renderSvg(bag.system, clockedView(), bag.empire, style, { frame: frame });
   readout.textContent = '';
   sky.querySelectorAll('[data-au]').forEach(function (el) {
     el.addEventListener('pointerenter', function () {
@@ -36,8 +50,37 @@ function paint() {
       readout.textContent = '';
     });
   });
-  document.getElementById('crumb-system').setAttribute('aria-current', frame === 'system' ? 'true' : 'false');
-  document.getElementById('crumb-focus').setAttribute('aria-current', frame === 'system' ? 'false' : 'true');
+  paintCrumbs();
+}
+
+function crumbText(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function paintCrumbs() {
+  const host = document.getElementById('crumbs');
+  if (!host || !bag) return;
+  const star = bag.system.star || {};
+  let focusBody = null;
+  if (frame && frame !== 'system') {
+    focusBody = (bag.system.bodies || []).find(function (body) { return body.id === frame; }) || null;
+    if (!focusBody || !hasSubmap(bag.system, focusBody.id)) {
+      frame = 'system';
+      focusBody = null;
+    }
+  }
+  let html = '<button type="button" id="crumb-system" data-frame="system"' +
+    (frame === 'system' ? ' aria-current="true"' : '') + '>' + crumbText(star.name || 'System') + '</button>';
+  if (focusBody) {
+    html += '<span aria-hidden="true">/</span>';
+    html += '<button type="button" id="crumb-focus" data-frame="' + crumbText(frame) + '" aria-current="true">' +
+      crumbText(focusBody.name || frame) + '</button>';
+  }
+  host.innerHTML = html;
 }
 
 function cardKey(id) {
@@ -79,16 +122,32 @@ sky.addEventListener('click', function (event) {
 });
 
 function showFrame(next) {
-  frame = next;
+  if (next && next !== 'system' && (!bag || !hasSubmap(bag.system, next))) return;
+  frame = next || 'system';
   if (bag) bag.view.callouts = [];
   paint();
 }
 
-document.getElementById('crumb-system').addEventListener('click', function () {
-  showFrame('system');
-});
-document.getElementById('crumb-focus').addEventListener('click', function () {
-  showFrame(this.getAttribute('data-frame') || 'system');
+const crumbHost = document.getElementById('crumbs');
+if (crumbHost) {
+  crumbHost.addEventListener('click', function (event) {
+    const button = event.target.closest ? event.target.closest('button') : null;
+    if (!button || !crumbHost.contains(button)) return;
+    showFrame(button.getAttribute('data-frame') || 'system');
+  });
+}
+
+sky.addEventListener('dblclick', function (event) {
+  if (!bag) return;
+  const hit = event.target.closest ? event.target.closest('[data-callout]') : null;
+  if (!hit || !sky.contains(hit)) return;
+  const raw = hit.getAttribute('data-callout') || '';
+  const id = raw.indexOf('body:') === 0 ? raw.slice(5) : raw;
+  if (!id || id === 'star') {
+    showFrame('system');
+    return;
+  }
+  if (hasSubmap(bag.system, id)) showFrame(id);
 });
 
 function probeWebgl() {
@@ -129,6 +188,26 @@ if (resourceToggle) {
     writeResourceStorage('3d');
     const dest = resourceDestination('svg', { mode: '3d' }, location.search);
     if (dest) location.assign(dest);
+  });
+}
+
+const timeDock = document.querySelector('.dock');
+if (timeDock) {
+  timeDock.addEventListener('click', function (event) {
+    const button = event.target.closest ? event.target.closest('button[data-days]') : null;
+    if (!button || !timeDock.contains(button) || !bag) return;
+    const days = Number(button.getAttribute('data-days'));
+    if (!Number.isFinite(days)) return;
+    const search = typeof location === 'undefined' ? '' : location.search;
+    writeViewerState(stepElapsed(readViewerState(), systemIdFromSearch(search), days));
+    paint();
+  });
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', function (event) {
+    if (!event || event.key !== VIEWER_STATE_KEY) return;
+    paint();
   });
 }
 

@@ -43,9 +43,7 @@
   <div class="dock">
     <div class="dock-row">
       <p id="crumbs">
-        <button type="button" id="crumb-system" data-frame="system">Tau Ceti</button>
-        <span aria-hidden="true">/</span>
-        <button type="button" id="crumb-focus" data-frame="tc5">Kakakiko</button>
+        <button type="button" id="crumb-system" data-frame="system">System</button>
       </p>
       <span id="zoom-note">Zoom: wheel</span>
       <label>Elevation <input id="elev" type="range" min="15" max="75" value="20"> <span id="elev-readout">20°</span></label>
@@ -55,7 +53,10 @@
           <option value="mardat">mardat</option>
         </select>
       </label>
-      <button type="button" id="time-play">Time ×1, paused</button>
+      <button type="button" id="time-back-10" data-days="-10">-10 days</button>
+      <button type="button" id="time-back" data-days="-1">-1 day</button>
+      <button type="button" id="time-fwd" data-days="1">+1 day</button>
+      <button type="button" id="time-fwd-10" data-days="10">+10 days</button>
       <button type="button" id="resource-toggle">SVG view</button>
     </div>
     <details id="lore-settings" class="lore-settings">

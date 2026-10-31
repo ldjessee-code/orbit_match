@@ -9,6 +9,14 @@ import {
   resourceDestination,
   writeResourceStorage
 } from '../js/low-resource.js';
+import {
+  VIEWER_STATE_KEY,
+  readViewerState,
+  stepElapsed,
+  systemIdFromSearch,
+  viewAtClock,
+  writeViewerState
+} from '../js/viewer-state.js';
 import { loreSettingsFromSystem, loreSettingsMarkup } from './lore-settings.js';
 import { polarLimits, cameraPose, clampElevation } from './frame.js';
 import {
@@ -36,7 +44,8 @@ import {
   selectFromPick,
   assignCardSlots,
   calloutLines,
-  choosePick
+  choosePick,
+  hasSubmap
 } from './scene-model.js';
 import {
   DENSITY_DEFAULT,
@@ -147,7 +156,8 @@ function viewNow() {
   next.distance_mode = session.distance_mode;
   next.elevation_deg = session.elevation_deg;
   next.azimuth_deg = session.azimuth_deg;
-  return next;
+  const search = typeof location === 'undefined' ? '' : location.search;
+  return viewAtClock(next, loadedSystem, readViewerState(), systemIdFromSearch(search));
 }
 
 function stageSize() {
@@ -259,7 +269,7 @@ function syncLabels(data) {
   data.bodies.forEach(function (body) {
     const el = document.createElement('span');
     el.className = 'body-label';
-    el.textContent = body.name;
+    el.textContent = body.submap ? body.name + ' ·' : body.name;
     host.appendChild(el);
     labelEntries.push({ el: el, position: body.position });
   });
@@ -284,10 +294,33 @@ function placeLabels() {
 }
 
 function paintCrumbs() {
-  const systemCrumb = document.getElementById('crumb-system');
-  const focusCrumb = document.getElementById('crumb-focus');
-  if (systemCrumb) systemCrumb.setAttribute('aria-current', frame === 'system' ? 'true' : 'false');
-  if (focusCrumb) focusCrumb.setAttribute('aria-current', frame === 'system' ? 'false' : 'true');
+  const host = document.getElementById('crumbs');
+  if (!host) return;
+  const star = (loadedSystem && loadedSystem.star) || {};
+  let focusBody = null;
+  if (frame && frame !== 'system' && loadedSystem) {
+    focusBody = (loadedSystem.bodies || []).find(function (body) { return body.id === frame; }) || null;
+    if (!focusBody || !hasSubmap(loadedSystem, focusBody.id)) {
+      frame = 'system';
+      focusBody = null;
+    }
+  }
+  let html = '<button type="button" id="crumb-system" data-frame="system"' +
+    (frame === 'system' ? ' aria-current="true"' : '') + '>' + crumbText(star.name || 'System') + '</button>';
+  if (focusBody) {
+    html += '<span aria-hidden="true">/</span>';
+    html += '<button type="button" id="crumb-focus" data-frame="' + crumbText(frame) + '" aria-current="true">' +
+      crumbText(focusBody.name || frame) + '</button>';
+  }
+  host.innerHTML = html;
+}
+
+function crumbText(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function bodyDisplayName(id) {
@@ -911,6 +944,15 @@ function rebuild(THREE, root, resetCamera) {
     }
     root.add(mesh);
   });
+  (data.moonlets || []).forEach(function (moonlet) {
+    const marker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 10, 8),
+      new THREE.MeshStandardMaterial({ color: '#d8c9a3', roughness: 1, metalness: 0 })
+    );
+    marker.position.set(moonlet.position.x, moonlet.position.y, moonlet.position.z);
+    tagMesh(marker, moonlet.id, { a_km: moonlet.a_km }, moonlet.position);
+    root.add(marker);
+  });
   data.orbits.forEach(function (orbit) {
     const line = lineGeom(THREE, orbit.points, 0xd4f0ff, true);
     const owner = data.bodies.find(function (body) { return body.id === orbit.id; });
@@ -1097,25 +1139,32 @@ async function startViewer(THREE, OrbitControls, gl) {
       rebuild(THREE, root, false);
     });
   }
-  const timeButton = document.getElementById('time-play');
-  if (timeButton) {
-    timeButton.addEventListener('click', function () {
-      timeButton.textContent = 'Time ×1, paused';
+  const timeDock = document.querySelector('.dock');
+  if (timeDock) {
+    timeDock.addEventListener('click', function (event) {
+      const button = event.target.closest ? event.target.closest('button[data-days]') : null;
+      if (!button || !timeDock.contains(button)) return;
+      const days = Number(button.getAttribute('data-days'));
+      if (!Number.isFinite(days)) return;
+      const search = typeof location === 'undefined' ? '' : location.search;
+      writeViewerState(stepElapsed(readViewerState(), systemIdFromSearch(search), days));
+      rebuild(THREE, root, false);
     });
   }
-  const crumbSystem = document.getElementById('crumb-system');
-  const crumbFocus = document.getElementById('crumb-focus');
-  if (crumbSystem) {
-    crumbSystem.addEventListener('click', function () {
-      frame = 'system';
-      session = Object.assign({}, session, { focused: null });
-      rebuild(THREE, root, true);
-    });
-  }
-  if (crumbFocus) {
-    crumbFocus.addEventListener('click', function () {
-      frame = crumbFocus.getAttribute('data-frame') || 'tc5';
-      session = Object.assign({}, session, { focused: frame });
+  window.addEventListener('storage', function (event) {
+    if (!event || event.key !== VIEWER_STATE_KEY) return;
+    if (!loadedSystem) return;
+    rebuild(THREE, root, false);
+  });
+  const crumbHost = document.getElementById('crumbs');
+  if (crumbHost) {
+    crumbHost.addEventListener('click', function (event) {
+      const button = event.target.closest ? event.target.closest('button') : null;
+      if (!button || !crumbHost.contains(button)) return;
+      const next = button.getAttribute('data-frame') || 'system';
+      if (next !== 'system' && !hasSubmap(loadedSystem, next)) return;
+      frame = next;
+      session = Object.assign({}, session, { focused: next === 'system' ? null : next });
       rebuild(THREE, root, true);
     });
   }
@@ -1176,9 +1225,9 @@ async function startViewer(THREE, OrbitControls, gl) {
       paintCards();
       return;
     }
-    if (hit.id === 'tc5' && frame !== 'tc5') {
-      frame = 'tc5';
-      session = frameBody(session, 'tc5');
+    if (hasSubmap(loadedSystem, hit.id) && frame !== hit.id) {
+      frame = hit.id;
+      session = frameBody(session, hit.id);
       rebuild(THREE, root, true);
       paintCards();
       return;

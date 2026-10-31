@@ -135,7 +135,17 @@ function adoptReference(data) {
 function adoptEpoch(data) {
   if (!Object.prototype.hasOwnProperty.call(data, 'epoch') || data.epoch == null) return;
   if (typeof data.epoch === 'string') return;
-  if (typeof data.epoch === 'object' && !Array.isArray(data.epoch)) return;
+  if (typeof data.epoch === 'object' && !Array.isArray(data.epoch)) {
+    const raw = data.epoch.game_datetime;
+    if (typeof raw === 'string') {
+      const text = raw.trim();
+      if (text) data.epoch.game_datetime = text;
+      else delete data.epoch.game_datetime;
+    } else if (Object.prototype.hasOwnProperty.call(data.epoch, 'game_datetime')) {
+      delete data.epoch.game_datetime;
+    }
+    return;
+  }
   if (typeof data.epoch === 'number' && Number.isFinite(data.epoch)) {
     data.epoch = String(data.epoch);
     return;

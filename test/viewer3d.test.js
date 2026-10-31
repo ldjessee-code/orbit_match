@@ -216,6 +216,65 @@ test('close frame puts Kakakiko at the origin and Shudder inside Der', async fun
   close.orbits.forEach(function (orbit) {
     orbit.points.forEach(function (point) { assert.equal(point.y, 0); });
   });
+  assert.doesNotMatch(read('site/viewer/index.html'), /Kakakiko/);
+  assert.doesNotMatch(read('site/viewer3d/index.html'), /Kakakiko/);
+  assert.doesNotMatch(read('site/viewer/index.html'), /data-frame="tc5"/);
+  assert.doesNotMatch(read('site/viewer3d/index.html'), /data-frame="tc5"/);
+  assert.match(read('site/viewer3d/index.html'), /WebGL is not available/);
+  assert.match(read('site/viewer/viewer.js'), /probed\.webgl === false/);
+});
+
+test('close frame works for a parent that is not tc5', async function () {
+  const bag = await loaded();
+  const schema = await import('../site/js/schema.js');
+  const system = schema.loadSystem({
+    orbit_match: 2,
+    star: { name: 'Demo Star', mass_solar: 1 },
+    bodies: [
+      { id: 'giant', name: 'Giant', kind: 'planet', parent: null, orbit: { a_au: 1, period_days: 365 }, physical: { radius_km: 20000 } },
+      { id: 'moon', name: 'Pebble', kind: 'moon', parent: 'giant', orbit: { a_km: 40000, e: 0, period_days: 2 } },
+      { id: 'moon2', name: 'Moon Two', kind: 'moon', parent: 'giant', orbit: { a_km: 80000, e: 0, period_days: 4 } },
+      { id: 'dock', name: 'Dock', kind: 'station', parent: 'moon2', orbit: { a_km: 500, e: 0, period_days: 0.2 } }
+    ]
+  });
+  const close = bag.model.buildScene(system, bag.view, { frame: 'giant' });
+  assert.equal(close.focusId, 'giant');
+  assert.equal(close.frame, 'giant');
+  assert.equal(close.star, null);
+  assert.ok(close.bodies.some(function (body) { return body.id === 'moon'; }));
+  assert.ok(close.bodies.some(function (body) { return body.id === 'moon2' && body.submap === true; }));
+  assert.equal(close.bodies.some(function (body) { return body.id === 'dock'; }), false);
+  const nested = bag.model.buildScene(system, bag.view, { frame: 'moon2' });
+  assert.equal(nested.focusId, 'moon2');
+  assert.ok(nested.bodies.some(function (body) { return body.id === 'dock'; }));
+  assert.equal(nested.bodies.some(function (body) { return body.id === 'giant'; }), false);
+  const client = read('site/viewer3d/viewer3d.js');
+  assert.doesNotMatch(client, /hit\.id === 'tc5'/);
+  assert.match(client, /hasSubmap/);
+  assert.match(read('site/viewer/viewer.js'), /hasSubmap/);
+});
+
+test('a body with no children and no rings does not advertise a submap', async function () {
+  const bag = await loaded();
+  assert.equal(typeof bag.model.hasSubmap, 'function');
+  assert.equal(bag.model.hasSubmap(bag.system, 'tc1'), false);
+  assert.equal(bag.model.hasSubmap(bag.system, 'b1'), false);
+});
+
+test('Cue Ball has a submap because of rings', async function () {
+  const bag = await loaded();
+  assert.equal(bag.model.hasSubmap(bag.system, 'tc7'), true);
+  assert.equal(bag.model.hasSubmap(bag.system, 'tc6'), true);
+  assert.equal(bag.model.hasSubmap(bag.system, 'tc8'), true);
+  assert.equal(bag.model.hasSubmap(bag.system, 'tc5'), true);
+  const onlyHalo = {
+    bodies: [{
+      id: 'bare',
+      name: 'Bare',
+      ring_system: { bands: [{ name: 'phoebe_like', draw: false, r_in_km: { value: 100 }, r_out_km: { value: 200 } }] }
+    }]
+  };
+  assert.equal(bag.model.hasSubmap(onlyHalo, 'bare'), false);
 });
 
 test('session cards stay at three and do not move the camera', async function () {
@@ -806,6 +865,151 @@ test('starfield background is a seeded equirectangular 2:1 texture', async funct
   assert.ok(dark > bright * 20, 'dark ' + dark + ' bright ' + bright);
   assert.ok(bright > 400, String(bright));
   assert.ok(tinted > 80, String(tinted));
+});
+
+test('Kakakiko close-up uses one kilometre scale', async function () {
+  const bag = await loaded();
+  assert.equal(typeof bag.model.closeExtentKm, 'function');
+  const extent = bag.model.closeExtentKm(bag.system, 'tc5');
+  assert.ok(Math.abs(extent - 240000 * 1.03) < 1e-6, String(extent));
+  const close = bag.model.buildScene(bag.system, bag.view, { frame: 'tc5' });
+  assert.equal(close.closeSpan, 8);
+  assert.ok(Math.abs(close.extentKm - extent) < 1e-6, String(close.extentKm));
+  const focus = close.bodies.find(function (body) { return body.id === 'tc5'; });
+  const haven = close.bodies.find(function (body) { return body.id === 'haven'; });
+  const shudder = close.bodies.find(function (body) { return body.id === 'tc5a'; });
+  const der = close.bodies.find(function (body) { return body.id === 'tc5b'; });
+  assert.ok(Math.abs(focus.radius - (6628 / extent) * 8) < 1e-9, String(focus.radius));
+  assert.ok(Math.abs(focus.radius - 1.2) > 0.5, String(focus.radius));
+  const havenR = Math.hypot(haven.position.x, haven.position.z);
+  assert.ok(Math.abs(havenR - (54076 / extent) * 8) < 1e-6, String(havenR));
+  assert.ok(Math.abs(focus.radius / havenR - 6628 / 54076) < 1e-6, String(focus.radius / havenR));
+  const derSemi = havenR * (240000 / 54076);
+  const shudderSemi = havenR * (151060 / 54076);
+  assert.ok(Math.abs(derSemi / shudderSemi - 240000 / 151060) < 1e-9);
+  assert.ok(Math.abs(focus.radius / derSemi - 6628 / 240000) < 1e-6, String(focus.radius / derSemi));
+  const shudderR = Math.hypot(shudder.position.x, shudder.position.z);
+  const derR = Math.hypot(der.position.x, der.position.z);
+  assert.ok(Math.abs(derR / shudderR - (240000 * 0.97) / (151060 * 0.8)) < 1e-6, String(derR / shudderR));
+  assert.ok(shudder.position.x > 0 && der.position.x > 0);
+});
+
+test('elapsed_days moves the system view and the submap', async function () {
+  const clock = await import('../site/js/viewer-state.js');
+  const schema = await import('../site/js/schema.js');
+  const bag = await loaded();
+  assert.equal(clock.VIEWER_STATE_KEY, 'orbit-match-viewer-state');
+  const memory = {};
+  const storage = {
+    getItem: function (key) { return Object.prototype.hasOwnProperty.call(memory, key) ? memory[key] : null; },
+    setItem: function (key, value) { memory[key] = String(value); }
+  };
+  let state = clock.readViewerState(storage);
+  assert.equal(clock.elapsedDays(state, 'tau-ceti'), 0);
+  state = clock.setElapsedDays(state, 'tau-ceti', 3);
+  state = clock.setElapsedDays(state, 'other-star', 8);
+  clock.writeViewerState(state, storage);
+  const again = clock.readViewerState(storage);
+  assert.equal(clock.elapsedDays(again, 'tau-ceti'), 3);
+  assert.equal(clock.elapsedDays(again, 'other-star'), 8);
+  const parsed = JSON.parse(memory[clock.VIEWER_STATE_KEY]);
+  assert.equal(parsed.orbit_match_viewer_state, 1);
+  assert.equal(parsed.systems['tau-ceti'].elapsed_days, 3);
+  assert.equal(clock.clockDays(3, { t0_days: 1 }), 2);
+  const stepped = clock.stepElapsed(again, 'tau-ceti', -10);
+  assert.equal(clock.elapsedDays(stepped, 'tau-ceti'), -7);
+  assert.equal(clock.elapsedDays(again, 'tau-ceti'), 3);
+  const fileView = { epoch_days: 99, elevation_deg: 20, azimuth_deg: 0 };
+  const stamped = clock.viewAtClock(fileView, { epoch: { t0_days: 0 } }, again, 'tau-ceti');
+  assert.equal(stamped.epoch_days, 3);
+  assert.equal(fileView.epoch_days, 99);
+  const system = schema.loadSystem({
+    orbit_match: 2,
+    star: { name: 'Demo', mass_solar: 1 },
+    epoch: { t0_days: 0 },
+    bodies: [
+      { id: 'planet', name: 'Planet', kind: 'planet', parent: null, orbit: { a_au: 1, e: 0, period_days: 40, position_angle_deg: 0 } },
+      { id: 'moon', name: 'Moon', kind: 'moon', parent: 'planet', orbit: { a_km: 10000, e: 0, period_days: 4, position_angle_deg: 0 } }
+    ]
+  });
+  const view = {
+    elevation_deg: 20,
+    azimuth_deg: 0,
+    distance_mode: 'linear',
+    epoch_days: 0,
+    layers: { orbits: false, belts: false, habitable: false, transfers: false, labels: false }
+  };
+  const at0 = bag.model.buildScene(system, view);
+  const movedView = Object.assign({}, view, { epoch_days: clock.clockDays(10, system.epoch) });
+  const moved = bag.model.buildScene(system, movedView);
+  const planet0 = at0.bodies.find(function (body) { return body.id === 'planet'; });
+  const planet1 = moved.bodies.find(function (body) { return body.id === 'planet'; });
+  assert.ok(Math.hypot(planet1.position.x - planet0.position.x, planet1.position.z - planet0.position.z) > 0.05);
+  const close0 = bag.model.buildScene(system, view, { frame: 'planet' });
+  const close1 = bag.model.buildScene(system, movedView, { frame: 'planet' });
+  const moon0 = close0.bodies.find(function (body) { return body.id === 'moon'; });
+  const moon1 = close1.bodies.find(function (body) { return body.id === 'moon'; });
+  assert.ok(Math.hypot(moon1.position.x - moon0.position.x, moon1.position.z - moon0.position.z) > 0.05);
+  const repeat = bag.model.buildScene(system, movedView, { frame: 'planet' });
+  const moon2 = repeat.bodies.find(function (body) { return body.id === 'moon'; });
+  assert.equal(moon2.position.x, moon1.position.x);
+  assert.equal(moon2.position.z, moon1.position.z);
+  const svgPage = read('site/viewer/index.html');
+  const threePage = read('site/viewer3d/index.html');
+  [svgPage, threePage].forEach(function (page) {
+    assert.match(page, /id="time-back"/);
+    assert.match(page, /id="time-fwd"/);
+    assert.match(page, /data-days="-1"/);
+    assert.match(page, /data-days="1"/);
+    assert.match(page, /data-days="-10"/);
+    assert.match(page, /data-days="10"/);
+    assert.doesNotMatch(page, /paused/i);
+  });
+  const svgClient = read('site/viewer/viewer.js');
+  const threeClient = read('site/viewer3d/viewer3d.js');
+  [svgClient, threeClient].forEach(function (client) {
+    assert.match(client, /viewer-state\.js/);
+    assert.match(client, /viewAtClock/);
+    assert.match(client, /stepElapsed/);
+    assert.match(client, /writeViewerState/);
+    assert.match(client, /addEventListener\('storage'/);
+  });
+  assert.doesNotMatch(threeClient, /Time ×1, paused/);
+  assert.equal(schema.loadView(readJson('site/data/tau-ceti.view.json')).epoch_days, 0);
+});
+
+test('SVG and 3D place the same moon on the same side', async function () {
+  const bag = await loaded();
+  const schema = await import('../site/js/schema.js');
+  const draw = await import('../site/js/render-svg.js');
+  const system = schema.loadSystem({
+    orbit_match: 2,
+    star: { name: 'Demo', mass_solar: 1 },
+    bodies: [
+      { id: 'giant', name: 'Giant', kind: 'planet', parent: null, orbit: { a_au: 1, period_days: 365 }, physical: { radius_km: 10000 } },
+      { id: 'east', name: 'East', kind: 'moon', parent: 'giant', orbit: { a_km: 20000, e: 0, period_days: 2, position_angle_deg: 90 } },
+      { id: 'blank', name: 'Blank', kind: 'moon', parent: 'giant', orbit: { a_km: 40000, e: 0, period_days: 4 } }
+    ]
+  });
+  const close = bag.model.buildScene(system, bag.view, { frame: 'giant' });
+  const east = close.bodies.find(function (body) { return body.id === 'east'; });
+  const blank = close.bodies.find(function (body) { return body.id === 'blank'; });
+  assert.ok(Math.abs(east.position.x) < 1e-6, String(east.position.x));
+  assert.ok(east.position.z < 0, String(east.position.z));
+  assert.equal(east.angle_missing, false);
+  assert.ok(blank.position.x > 0, String(blank.position.x));
+  assert.ok(Math.abs(blank.position.z) < 1e-6, String(blank.position.z));
+  assert.equal(blank.angle_missing, true);
+  const empire = readJson('site/themes/empire.json');
+  const quiet = readJson('site/themes/quiet.json');
+  const svg = draw.renderSvg(system, bag.view, empire, quiet, { frame: 'giant' });
+  const eastDisk = svg.match(/<circle\b[^>]*\bdata-id="east"[^>]*>/);
+  const blankDisk = svg.match(/<circle\b[^>]*\bdata-id="blank"[^>]*>/);
+  assert.ok(eastDisk && blankDisk, 'moon disks');
+  const eastCy = Number(eastDisk[0].match(/\bcy="([^"]+)"/)[1]);
+  const blankCx = Number(blankDisk[0].match(/\bcx="([^"]+)"/)[1]);
+  assert.ok(eastCy < 530, String(eastCy));
+  assert.ok(blankCx > 820, String(blankCx));
 });
 
 test('viewer3d mounts the starfield and keeps dust out of the raycaster', function () {

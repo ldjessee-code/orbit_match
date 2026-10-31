@@ -164,6 +164,32 @@ test('holo chrome draws a scan pattern and the quiet plate does not', async func
   assert.match(read('site/viewer/plates/index.html'), /holo-empire-system\.svg/);
 });
 
+test('framing a moon draws that moon, not its parent', async function () {
+  const bag = await loaded();
+  const svg = bag.draw.renderSvg(bag.system, bag.view, bag.empire, bag.quiet, { frame: 'tc5a' });
+  const focus = elementById(svg, 'focus');
+  assert.equal(attr(focus, 'data-callout'), 'body:tc5a');
+  assert.match(svg, /Shudder/);
+  assert.doesNotMatch(svg, /Kakakiko/);
+  const schema = await import('../site/js/schema.js');
+  const system = schema.loadSystem({
+    orbit_match: 2,
+    star: { name: 'Demo' },
+    bodies: [
+      { id: 'giant', name: 'Giant', kind: 'planet', parent: null, orbit: { a_au: 1, period_days: 365 }, physical: { radius_km: 8000 } },
+      { id: 'moon2', name: 'Moon Two', kind: 'moon', parent: 'giant', orbit: { a_km: 20000, e: 0, period_days: 3 } },
+      { id: 'dock', name: 'Dock', kind: 'station', parent: 'moon2', orbit: { a_km: 400, e: 0, period_days: 0.1 } }
+    ]
+  });
+  const planet = bag.draw.renderSvg(system, bag.view, bag.empire, bag.quiet, { frame: 'giant' });
+  assert.match(planet, /data-submap="true"/);
+  assert.match(planet, /Moon Two ·/);
+  assert.doesNotMatch(planet, />Dock</);
+  const moon = bag.draw.renderSvg(system, bag.view, bag.empire, bag.quiet, { frame: 'moon2' });
+  assert.equal(attr(elementById(moon, 'focus'), 'data-callout'), 'body:moon2');
+  assert.match(moon, />Dock</);
+});
+
 test('Kakakiko close-up uses the synchronous ring, not moon Lagrange stations', async function () {
   const bag = await loaded();
   const svg = bag.draw.renderSvg(bag.system, bag.view, bag.empire, bag.quiet, { frame: 'tc5' });
@@ -184,6 +210,37 @@ test('Kakakiko close-up uses the synchronous ring, not moon Lagrange stations', 
   });
 });
 
+test('Kakakiko close-up shares one kilometre scale with the rings', async function () {
+  const bag = await loaded();
+  const model = await import('../site/viewer3d/scene-model.js');
+  const extent = model.closeExtentKm(bag.system, 'tc5');
+  const svg = bag.draw.renderSvg(bag.system, bag.view, bag.empire, bag.quiet, { frame: 'tc5' });
+  const focusR = Number(attr(elementById(svg, 'focus'), 'r'));
+  const px = 360 / extent;
+  assert.ok(Math.abs(focusR - 6628 * px) < 0.15, String(focusR));
+  const haven = svg.match(/<ellipse\b[^>]*\bdata-role="orbit"[^>]*\bdata-id="haven"[^>]*>/);
+  assert.ok(haven, 'haven orbit');
+  const havenRx = Number(attr(haven[0], 'rx'));
+  assert.ok(Math.abs(havenRx - 54076 * px) < 0.15, String(havenRx));
+  assert.ok(Math.abs(focusR / havenRx - 6628 / 54076) < 0.01, String(focusR / havenRx));
+  const cueExtent = model.closeExtentKm(bag.system, 'tc7');
+  const cue = bag.draw.renderSvg(bag.system, bag.view, bag.empire, bag.quiet, { frame: 'tc7' });
+  assert.match(cue, /data-role="ring"/);
+  assert.match(cue, /data-band="A"/);
+  assert.doesNotMatch(cue, /data-band="cassini_like_gap"/);
+  assert.doesNotMatch(cue, /data-band="phoebe_like"/);
+  const bandF = cue.match(/<ellipse\b[^>]*\bdata-role="ring"[^>]*\bdata-band="F"[^>]*>/);
+  assert.ok(bandF, 'F ring');
+  const width = Number(attr(bandF[0], 'stroke-width'));
+  assert.ok(Math.abs(width - 50 * (360 / cueExtent)) < 0.02, String(width));
+  const croquet = bag.draw.renderSvg(bag.system, bag.view, bag.empire, bag.quiet, { frame: 'tc6' });
+  assert.match(croquet, /data-role="moonlet"/);
+  assert.match(croquet, /100100/);
+  assert.doesNotMatch(croquet, /data-callout="body:tc6-moonlet/);
+  assert.match(svg, /Linear kilometres/);
+  assert.doesNotMatch(svg, /Stations share the synchronous ring/);
+});
+
 test('home page points at the viewer and the page does not embed the fixture', function () {
   const home = read('site/index.html');
   assert.match(home, /View Tau Ceti/);
@@ -191,7 +248,12 @@ test('home page points at the viewer and the page does not embed the fixture', f
   assert.match(home, /href="viewer\/\?view=svg"/);
   const page = read('site/viewer/index.html');
   assert.match(page, /type="module"/);
-  assert.match(page, /paused/i);
+  assert.doesNotMatch(page, /paused/i);
+  assert.match(page, /id="time-back"/);
+  assert.match(page, /id="time-fwd"/);
+  assert.match(page, /data-days="-10"/);
+  assert.match(page, /data-days="10"/);
+  assert.doesNotMatch(page, /id="time-play"[^>]*disabled/);
   assert.doesNotMatch(page, /151060/);
   assert.doesNotMatch(page, /8131|8130|127\.0\.0\.1:8080/);
   const client = read('site/viewer/viewer.js');

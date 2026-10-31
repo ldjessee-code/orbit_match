@@ -42,6 +42,10 @@ If `period_days` is missing and `a_au` is present, the loader derives the period
 
 `star.name` is the label drawn beside the disc. `hostname` stays the setting's short name. A view may name one transfer with `transfer.from` and `transfer.to`. The picture asks `kepler.js` for the days and the burns. A missing start angle is 0° in both viewers. The close view uses one kilometre scale for the focus disc, moon orbits, and drawable rings. The system view stays schematic.
 
+## Playback
+
+Both viewers play the shared `elapsed_days` clock forward or in reverse, or they pause. Speeds are 1, 10, and 100 days per real second. The close view also offers 1 hour per real second, which is 1/24 day per second. Leaving the close view while that speed is selected returns the speed to 1 day per second and keeps play state and direction. A page loads paused at 1 day per second. Play, direction, and speed belong to that page. They are not stored in `orbit-match-viewer-state`. A playing page writes `elapsed_days`. The other page repaints when the `storage` event fires. Each tick recomputes positions from the current `elapsed_days`. A frame of one second or less counts in full. A longer frame counts as 0.25 seconds, so a background tab does not jump the clock. The shared write waits about 100 ms, and it always runs on pause and on a step.
+
 ## Stability file
 
 `tau-ceti.stability.json` is a short note for cards. It is not an ephemeris. The page does not parse rebound logs or `.bin` archives.

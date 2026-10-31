@@ -64,8 +64,13 @@ main.viewer-main {
   margin: 0.15rem 0;
 }
 
-#crumbs button[aria-current="true"] {
+#crumbs button[aria-current="true"],
+.dock button[aria-pressed="true"] {
   border-color: var(--accent);
+}
+
+.dock button[aria-pressed="true"] {
+  font-weight: 700;
 }
 
 #readout {

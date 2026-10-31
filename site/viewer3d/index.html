@@ -53,6 +53,16 @@
           <option value="mardat">mardat</option>
         </select>
       </label>
+      <button type="button" id="play-reverse" aria-pressed="false">Play reverse</button>
+      <button type="button" id="play-pause" aria-pressed="true">Pause</button>
+      <button type="button" id="play-forward" aria-pressed="false">Play forward</button>
+      <label>Speed
+        <select id="play-speed" aria-label="Playback speed">
+          <option value="d1" selected>1 day/sec</option>
+          <option value="d10">10 days/sec</option>
+          <option value="d100">100 days/sec</option>
+        </select>
+      </label>
       <button type="button" id="time-back-10" data-days="-10">-10 days</button>
       <button type="button" id="time-back" data-days="-1">-1 day</button>
       <button type="button" id="time-fwd" data-days="1">+1 day</button>

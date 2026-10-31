@@ -10,13 +10,11 @@ import {
   writeResourceStorage
 } from '../js/low-resource.js';
 import {
-  VIEWER_STATE_KEY,
   readViewerState,
-  stepElapsed,
   systemIdFromSearch,
-  viewAtClock,
-  writeViewerState
+  viewAtClock
 } from '../js/viewer-state.js';
+import { mountPlaybackDock } from '../js/playback.js';
 import { loreSettingsFromSystem, loreSettingsMarkup } from './lore-settings.js';
 import { polarLimits, cameraPose, clampElevation } from './frame.js';
 import {
@@ -113,6 +111,11 @@ let dustSprite = null;
 let BodyGLTFLoader = null;
 let modelGeneration = 0;
 let layerState = defaultLayerState();
+let playback = null;
+
+export function bindTimeDock(env) {
+  return mountPlaybackDock(env);
+}
 
 function showFallback() {
   const el = document.getElementById('fallback');
@@ -157,7 +160,8 @@ function viewNow() {
   next.elevation_deg = session.elevation_deg;
   next.azimuth_deg = session.azimuth_deg;
   const search = typeof location === 'undefined' ? '' : location.search;
-  return viewAtClock(next, loadedSystem, readViewerState(), systemIdFromSearch(search));
+  const state = playback && playback.viewerState ? playback.viewerState() : readViewerState();
+  return viewAtClock(next, loadedSystem, state, systemIdFromSearch(search));
 }
 
 function stageSize() {
@@ -301,7 +305,10 @@ function paintCrumbs() {
   if (frame && frame !== 'system' && loadedSystem) {
     focusBody = (loadedSystem.bodies || []).find(function (body) { return body.id === frame; }) || null;
     if (!focusBody || !hasSubmap(loadedSystem, focusBody.id)) {
-      frame = 'system';
+      if (frame !== 'system') {
+        frame = 'system';
+        if (playback) playback.setClose(frame !== 'system');
+      }
       focusBody = null;
     }
   }
@@ -1141,21 +1148,33 @@ async function startViewer(THREE, OrbitControls, gl) {
   }
   const timeDock = document.querySelector('.dock');
   if (timeDock) {
-    timeDock.addEventListener('click', function (event) {
-      const button = event.target.closest ? event.target.closest('button[data-days]') : null;
-      if (!button || !timeDock.contains(button)) return;
-      const days = Number(button.getAttribute('data-days'));
-      if (!Number.isFinite(days)) return;
-      const search = typeof location === 'undefined' ? '' : location.search;
-      writeViewerState(stepElapsed(readViewerState(), systemIdFromSearch(search), days));
-      rebuild(THREE, root, false);
+    playback = bindTimeDock({
+      document: document,
+      window: window,
+      dock: timeDock,
+      storage: typeof localStorage === 'undefined' ? null : localStorage,
+      now: function () {
+        return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      },
+      requestFrame: function (fn) {
+        if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(fn);
+        return setTimeout(function () { fn(Date.now()); }, 16);
+      },
+      cancelFrame: function (id) {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(id);
+        clearTimeout(id);
+      },
+      onPaint: function () {
+        if (!loadedSystem) return;
+        rebuild(THREE, root, false);
+      },
+      systemId: function () {
+        const search = typeof location === 'undefined' ? '' : location.search;
+        return systemIdFromSearch(search);
+      },
+      isClose: function () { return frame !== 'system'; }
     });
   }
-  window.addEventListener('storage', function (event) {
-    if (!event || event.key !== VIEWER_STATE_KEY) return;
-    if (!loadedSystem) return;
-    rebuild(THREE, root, false);
-  });
   const crumbHost = document.getElementById('crumbs');
   if (crumbHost) {
     crumbHost.addEventListener('click', function (event) {
@@ -1164,6 +1183,7 @@ async function startViewer(THREE, OrbitControls, gl) {
       const next = button.getAttribute('data-frame') || 'system';
       if (next !== 'system' && !hasSubmap(loadedSystem, next)) return;
       frame = next;
+      if (playback) playback.setClose(frame !== 'system');
       session = Object.assign({}, session, { focused: next === 'system' ? null : next });
       rebuild(THREE, root, true);
     });
@@ -1220,6 +1240,7 @@ async function startViewer(THREE, OrbitControls, gl) {
     }
     if (hit.id === 'star') {
       frame = 'system';
+      if (playback) playback.setClose(frame !== 'system');
       session = Object.assign({}, session, { focused: null });
       rebuild(THREE, root, true);
       paintCards();
@@ -1227,6 +1248,7 @@ async function startViewer(THREE, OrbitControls, gl) {
     }
     if (hasSubmap(loadedSystem, hit.id) && frame !== hit.id) {
       frame = hit.id;
+      if (playback) playback.setClose(frame !== 'system');
       session = frameBody(session, hit.id);
       rebuild(THREE, root, true);
       paintCards();

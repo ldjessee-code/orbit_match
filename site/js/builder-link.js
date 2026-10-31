@@ -112,6 +112,33 @@ function exportManualBody(body) {
 const ANGLE_FIELDS = ['position_angle_deg', 'perihelion_longitude_deg'];
 const REFERENCE_LABEL = 'toward the vernal point / arbitrary';
 
+function stampRandomAngles(body, roll) {
+  const pos = Number(roll());
+  const peri = Number(roll());
+  body.position_angle_deg = pos.toFixed(2);
+  body.perihelion_longitude_deg = peri.toFixed(2);
+  body.angle_error = '';
+}
+
+// Belts have no single longitude. Moons, including nested moons, do.
+export function randomizeManualAngles(bodies, randomAngleDeg) {
+  const roll = typeof randomAngleDeg === 'function' ? randomAngleDeg : function () { return 0; };
+  return (bodies || []).map(function (body) {
+    const next = Object.assign({}, body || {});
+    const moons = Array.isArray(body && body.moons) ? body.moons : null;
+    if (next.kind !== 'belt') stampRandomAngles(next, roll);
+    if (moons) {
+      next.moons = moons.map(function (moon) {
+        const copy = Object.assign({}, moon || {});
+        if (next.kind === 'belt' || copy.kind === 'belt') return copy;
+        stampRandomAngles(copy, roll);
+        return copy;
+      });
+    }
+    return next;
+  });
+}
+
 function epochForSave(header) {
   const obj = header.epoch_object;
   if (obj && typeof obj === 'object' && !Array.isArray(obj) && String(header.epoch || '') === String(obj.label || '')) {
@@ -208,6 +235,9 @@ export function manualBodyFromSystem(body) {
   }
   if (typeof next.position_angle_deg === 'number') next.position_angle_deg = String(next.position_angle_deg);
   if (typeof next.perihelion_longitude_deg === 'number') next.perihelion_longitude_deg = String(next.perihelion_longitude_deg);
+  if (Array.isArray(next.moons)) {
+    next.moons = next.moons.map(function (moon) { return manualBodyFromSystem(moon); });
+  }
   return next;
 }
 
@@ -224,6 +254,7 @@ if (typeof window !== 'undefined') {
     manualHeaderFromSystem: manualHeaderFromSystem,
     systemRecordFromManual: systemRecordFromManual,
     parseAngleDeg: parseAngleDeg,
-    randomAngleDeg: randomAngleDeg
+    randomAngleDeg: randomAngleDeg,
+    randomizeManualAngles: randomizeManualAngles
   };
 }

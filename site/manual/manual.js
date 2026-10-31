@@ -206,6 +206,15 @@
           field("Unit", '<select data-moon-field="unit"><option value="days"' + (moon.unit !== "years" ? " selected" : "") + '>Days</option><option value="years"' + (moon.unit === "years" ? " selected" : "") + ">Years</option></select>") +
         "</div>" +
         field("Distance from planet (km)", '<input data-moon-field="distanceKm" data-help="moon-distance" inputmode="decimal" value="' + esc(moon.distanceKm) + '">') +
+        '<div class="angle-row">' +
+          field("Position at epoch (deg)", '<input data-moon-field="position_angle_deg" inputmode="decimal" value="' + esc(moon.position_angle_deg) + '">') +
+          '<button type="button" data-act="random-moon-position">Random</button>' +
+        "</div>" +
+        '<div class="angle-row">' +
+          field("Longitude of perihelion (deg)", '<input data-moon-field="perihelion_longitude_deg" inputmode="decimal" value="' + esc(moon.perihelion_longitude_deg) + '">') +
+          '<button type="button" data-act="random-moon-perihelion">Random</button>' +
+        "</div>" +
+        (moon.angle_error ? '<p class="warn" data-angle-error>' + esc(moon.angle_error) + "</p>" : "") +
         "<details><summary>Moon facts</summary>" +
           field("Gravity", '<input data-moon-field="gravity" value="' + esc(moon.gravity) + '">') +
           field("Atmosphere", '<input data-moon-field="atmosphere" value="' + esc(moon.atmosphere) + '">') +
@@ -496,6 +505,21 @@
         saveLocal();
         return;
       }
+      if (input.dataset.moonField === "position_angle_deg" || input.dataset.moonField === "perihelion_longitude_deg") {
+        moon[input.dataset.moonField] = input.value;
+        var moonParsed = angleParse(input.value);
+        moon.angle_error = moonParsed.ok ? "" : moonParsed.error;
+        var moonWarn = moonEl.querySelector("[data-angle-error]");
+        if (!moonWarn && !moonParsed.ok) {
+          moonWarn = document.createElement("p");
+          moonWarn.className = "warn";
+          moonWarn.setAttribute("data-angle-error", "");
+          moonEl.appendChild(moonWarn);
+        }
+        if (moonWarn) moonWarn.textContent = moonParsed.ok ? "" : moonParsed.error;
+        saveLocal();
+        return;
+      }
       moon[input.dataset.moonField] = input.value;
       if (input.dataset.moonField === "pressure" || input.dataset.moonField === "o2" || input.dataset.moonField === "co2") {
         renderStack({ body: body.id, field: input.dataset.moonField });
@@ -599,11 +623,17 @@
       renderStack();
       saveLocal();
     }
-    if (act.dataset.act === "random-position" || act.dataset.act === "random-perihelion") {
+    if (act.dataset.act === "random-position" || act.dataset.act === "random-perihelion" || act.dataset.act === "random-moon-position" || act.dataset.act === "random-moon-perihelion") {
       var planet = bodies().find(function (item) { return item.id === id; });
       if (!planet) return;
-      var which = act.dataset.act === "random-position" ? "position" : "peri";
-      if (!applyRandom(planet, which)) return;
+      var moonBox = act.closest("[data-moon]");
+      var target = planet;
+      if (moonBox) {
+        target = (planet.moons || []).find(function (item) { return item.id === moonBox.dataset.moon; });
+      }
+      if (!target) return;
+      var which = act.dataset.act === "random-position" || act.dataset.act === "random-moon-position" ? "position" : "peri";
+      if (!applyRandom(target, which)) return;
       renderStack();
       saveLocal();
     }
@@ -652,12 +682,30 @@
   }
 
   function randomizeAll() {
-    var any = false;
-    bodies().forEach(function (body) {
-      if (body.kind === "moon" || body.kind === "belt") return;
-      if (applyRandom(body, "both")) any = true;
+    var api = angleApi();
+    if (!api || !api.randomizeManualAngles || !api.randomAngleDeg) {
+      setStatus("The angle tool did not load.");
+      return;
+    }
+    var list = bodies();
+    var next = api.randomizeManualAngles(list, function () { return api.randomAngleDeg(); });
+    var changed = false;
+    list.forEach(function (body, index) {
+      var fresh = next[index];
+      if (!fresh || body.kind === "belt") return;
+      body.position_angle_deg = fresh.position_angle_deg;
+      body.perihelion_longitude_deg = fresh.perihelion_longitude_deg;
+      body.angle_error = "";
+      changed = true;
+      (body.moons || []).forEach(function (moon, moonIndex) {
+        var freshMoon = (fresh.moons || [])[moonIndex];
+        if (!freshMoon || moon.kind === "belt") return;
+        moon.position_angle_deg = freshMoon.position_angle_deg;
+        moon.perihelion_longitude_deg = freshMoon.perihelion_longitude_deg;
+        moon.angle_error = "";
+      });
     });
-    if (!any) return;
+    if (!changed) return;
     renderStack();
     saveLocal();
   }
@@ -746,8 +794,9 @@
       var next = link ? link.manualBodyFromSystem(body) : body;
       next.id = next.id || uid();
       next.moons = (next.moons || []).map(function (moon) {
-        moon.id = moon.id || uid();
-        return moon;
+        var mapped = link && link.manualBodyFromSystem ? link.manualBodyFromSystem(moon) : moon;
+        mapped.id = mapped.id || uid();
+        return mapped;
       });
       return next;
     });

@@ -14,6 +14,8 @@ A trip can be run at three fidelities.
 
 The page is [https://ldjessee-code.github.io/orbit_match/](https://ldjessee-code.github.io/orbit_match/). [Build a system](https://ldjessee-code.github.io/orbit_match/manual/) from the star list, or from a CSV the star map saved.
 
+Open the viewers over http. Opening an HTML file as `file://` blocks the data fetch and the map stays blank. From this repo, `node tools/serve-site.mjs` serves `site/` on `127.0.0.1` port 8131 (a port argument or `ORBIT_MATCH_PORT` overrides that). Or run `python -m http.server 8000` inside `site\`, then open `/viewer/` or `/viewer3d/`.
+
 ## Jumpgate Starroute
 
 Orbit Match can take a star from [Jumpgate Starroute](https://github.com/ldjessee-code/jumpgate_starroute) and hand back the system it built. The star map keeps the routes between stars. This program keeps the worlds and the burns inside one of them. The public addresses, and the default Turquenish neighborhood, are in [site/config.json](site/config.json).

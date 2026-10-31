@@ -1,4 +1,5 @@
 import { pos, hohmannDays, fusionMatched, AU_M, positionFromAngles } from './kepler.js';
+import { hasSubmap, closeExtentKm, isDrawableBand, bandEdgesKm, moonletsKm, angleIsMissing, displayAngleMap } from '../viewer3d/scene-model.js';
 
 const TAU = 2 * Math.PI;
 const W = 1600;
@@ -49,17 +50,11 @@ function heliocentric(system) {
 }
 
 function displayAngles(system) {
-  const worlds = heliocentric(system);
-  const angles = new Map();
-  worlds.forEach(function (body, index) {
-    const stored = body.orbit && body.orbit.mean_anomaly_deg;
-    angles.set(body.id, typeof stored === 'number' ? (stored * Math.PI) / 180 : (index / worlds.length) * TAU);
-  });
-  worlds.forEach(function (body) {
-    if (!body.lagrange || !body.lagrange.of || !angles.has(body.lagrange.of)) return;
-    angles.set(body.id, angles.get(body.lagrange.of) + Math.PI / 3);
-  });
-  return angles;
+  return displayAngleMap(system);
+}
+
+function fine(value) {
+  return (Math.round(value * 1000) / 1000).toFixed(3);
 }
 
 function clockDays(view) {
@@ -154,13 +149,6 @@ function labelReach(item) {
 export function renderSvg(system, view, theme, style, options) {
   const frame = options && options.frame && options.frame !== 'system' ? options.frame : 'system';
   const focus = frame === 'system' ? null : byId(system, frame);
-  if (focus && focus.orbit && typeof focus.orbit.a_km !== 'number' && focus.kind !== 'belt') {
-    return renderClose(system, view, theme, style, focus);
-  }
-  if (focus && typeof (focus.orbit && focus.orbit.a_km) === 'number') {
-    const parent = byId(system, focus.parent);
-    return renderClose(system, view, theme, style, parent || focus);
-  }
   if (focus) return renderClose(system, view, theme, style, focus);
   return renderSystem(system, view, theme, style);
 }
@@ -207,7 +195,7 @@ function renderSystem(system, view, theme, style) {
     const angle = angles.get(body.id) || 0;
     const spot = spotAt(system, body, body.orbit.a_au, tDays, angle);
     const at = place(spot.x, spot.y);
-    return { body: body, at: at, r: diskRadius(body) };
+    return { body: body, at: at, r: diskRadius(body), submap: hasSubmap(system, body.id) };
   }).sort(function (a, b) { return a.at.sy - b.at.sy; });
   markers.filter(function (item) { return item.at.sy < CY; }).forEach(function (item) { bodyMark(parts, item, theme, style); });
   starDisk(parts, system, CX, CY, rStar, theme, style);
@@ -239,25 +227,48 @@ function renderSystem(system, view, theme, style) {
   return parts.join('\n');
 }
 
+function childKmSpot(system, body, tDays) {
+  const orbit = body.orbit || {};
+  const a = orbit.a_km || 0;
+  const e = orbit.e > 0 ? orbit.e : 0;
+  const period = orbit.period_days > 0 ? orbit.period_days : 1;
+  if (usesAngle(body)) return spotAt(system, body, a, tDays, 0);
+  let m0 = 0;
+  if (typeof body.angle_deg === 'number') m0 = (body.angle_deg * Math.PI) / 180;
+  else if (typeof orbit.mean_anomaly_deg === 'number') m0 = (orbit.mean_anomaly_deg * Math.PI) / 180;
+  return pos({ a: a, e: e, period_days: period, M0: m0, w: 0 }, tDays);
+}
+
+function drawCloseRings(parts, focus, px, ratio, cx, cy, style) {
+  const bands = focus.ring_system && focus.ring_system.bands;
+  if (!Array.isArray(bands)) return;
+  bands.forEach(function (band) {
+    if (!isDrawableBand(band)) return;
+    const km = bandEdgesKm(band);
+    const mid = (km.innerKm + km.outerKm) / 2;
+    const rx = mid * px;
+    const width = (km.outerKm - km.innerKm) * px;
+    parts.push('<ellipse data-role="ring" data-band="' + xml(band.name) + '" data-parent="' + xml(focus.id) + '" cx="' + cx + '" cy="' + cy + '" rx="' + fine(rx) + '" ry="' + fine(rx * ratio) + '" fill="none" stroke="' + style.orbit + '" stroke-width="' + fine(width) + '" pointer-events="none"/>');
+  });
+}
+
 function renderClose(system, view, theme, style, focus) {
   const elev = view.elevation_deg;
   const az = view.azimuth_deg || 0;
   const ratio = Math.sin((elev * Math.PI) / 180);
   const CX = 820;
   const CY = 530;
-  const children = (system.bodies || []).filter(function (body) { return body.parent === focus.id; });
-  let maxKm = 1;
-  children.forEach(function (body) {
-    const a = body.orbit.a_km || 0;
-    const e = body.orbit.e || 0;
-    maxKm = Math.max(maxKm, a * (1 + e));
+  const children = (system.bodies || []).filter(function (body) {
+    return body && body.parent === focus.id && body.kind !== 'belt' && body.orbit && typeof body.orbit.a_km === 'number';
   });
-  const px = 360 / maxKm;
+  const extent = closeExtentKm(system, focus);
+  const px = 360 / extent;
   const place = function (x, y) {
     return project(x, y, { cx: CX, cy: CY, scale: px, elevation_deg: elev, azimuth_deg: az });
   };
   const parts = [];
   parts.push(openSvg(style, theme));
+  drawCloseRings(parts, focus, px, ratio, CX, CY, style);
   const sync = children.filter(function (body) { return body.kind === 'structure' && body.orbit.a_km; });
   if (sync.length && layer(view, 'structures')) {
     ring(parts, CX, CY, sync[0].orbit.a_km * px, ratio, style.orbit, null, sync[0].id);
@@ -270,27 +281,24 @@ function renderClose(system, view, theme, style, focus) {
     });
   }
   const tDays = clockDays(view);
+  moonletsKm(focus).forEach(function (moonlet) {
+    const at = place(moonlet.a_km, 0);
+    parts.push('<circle data-role="moonlet" data-a-km="' + moonlet.a_km + '" cx="' + num(at.sx) + '" cy="' + num(at.sy) + '" r="3" fill="' + style.muted + '"/>');
+  });
   const marks = [];
   children.forEach(function (body) {
     const a = body.orbit.a_km || 0;
     const e = body.orbit.e || 0;
-    let x = a;
-    let y = 0;
-    if (usesAngle(body)) {
-      const spot = spotAt(system, body, a, tDays, 0);
-      x = spot.x;
-      y = spot.y;
-    } else if (typeof body.angle_deg === 'number') {
-      const ang = (body.angle_deg * Math.PI) / 180;
-      x = a * Math.cos(ang);
-      y = a * Math.sin(ang);
-    } else if (e) {
-      const spot = pos({ a: a, e: e, period_days: body.orbit.period_days || 1, M0: 0, w: 0 }, 0);
-      x = spot.x;
-      y = spot.y;
-    }
+    const spot = childKmSpot(system, body, tDays);
+    const x = spot.x;
+    const y = spot.y;
     const at = place(x, y);
-    marks.push({ body: body, at: at, r: body.kind === 'structure' ? 5 : Math.max(6, diskRadius(body) * 0.45) });
+    marks.push({
+      body: body,
+      at: at,
+      r: body.kind === 'structure' ? 5 : Math.max(6, diskRadius(body) * 0.45),
+      submap: hasSubmap(system, body.id)
+    });
     if (e >= 0.1 && layer(view, 'labels')) {
       const peri = a * (1 - e);
       const pe = place(peri, 0);
@@ -299,7 +307,8 @@ function renderClose(system, view, theme, style, focus) {
   });
   marks.sort(function (a, b) { return a.at.sy - b.at.sy; });
   marks.forEach(function (item) { bodyMark(parts, item, theme, style); });
-  const focusR = Math.max(18, diskRadius(focus));
+  const focusKm = focus.physical && typeof focus.physical.radius_km === 'number' && focus.physical.radius_km > 0 ? focus.physical.radius_km : 0;
+  const focusR = focusKm > 0 ? focusKm * px : Math.max(18, diskRadius(focus));
   parts.push('<circle id="focus" data-callout="body:' + xml(focus.id) + '" cx="' + CX + '" cy="' + CY + '" r="' + num(focusR) + '" fill="' + fillFor(focus, theme) + '" stroke="' + style.muted + '" stroke-width="1"/>');
   if (layer(view, 'labels')) {
     parts.push('<text data-callout="body:' + xml(focus.id) + '" text-anchor="middle" x="' + CX + '" y="' + (CY + focusR + 20) + '" fill="' + style.text + '" font-size="16">' + xml(focus.name) + '</text>');
@@ -553,7 +562,15 @@ function radialTag(parts, item, cx, cy, style) {
   const x = item.at.sx + (dx / len) * (reach + 16);
   const y = item.at.sy + (dy / len) * (reach + 16);
   const anchor = dx >= 0 ? 'start' : 'end';
-  parts.push('<text data-name="' + xml(item.body.id) + '" data-callout="body:' + xml(item.body.id) + '" text-anchor="' + anchor + '" x="' + num(x) + '" y="' + num(y) + '" fill="' + style.text + '" font-size="14">' + xml(item.body.name) + '</text>');
+  parts.push('<text data-name="' + xml(item.body.id) + '" data-callout="body:' + xml(item.body.id) + '"' + submapAttr(item) + ' text-anchor="' + anchor + '" x="' + num(x) + '" y="' + num(y) + '" fill="' + style.text + '" font-size="14">' + xml(labelName(item)) + '</text>');
+}
+
+function labelName(item) {
+  return item && item.submap ? item.body.name + ' ·' : item.body.name;
+}
+
+function submapAttr(item) {
+  return item && item.submap ? ' data-submap="true"' : '';
 }
 
 function nameTag(parts, item, style) {
@@ -586,7 +603,7 @@ function legend(parts, system, view, style, theme, mode, listed) {
   const y = 24;
   const notes = mode === 'system'
     ? ['Schematic distances.', 'Angles are for reading, not a date.']
-    : ['Linear kilometres.', 'Stations share the synchronous ring.'];
+    : ['Linear kilometres.', 'Moons, rings, and the disc share one scale.'];
   const height = 64 + rows.length * 18 + notes.length * 16;
   parts.push('<g id="legend">');
   parts.push('<rect x="' + x + '" y="' + y + '" width="300" height="' + height + '" rx="8" fill="' + style.surface + '" stroke="' + style.border + '" stroke-width="1"/>');
@@ -679,6 +696,7 @@ function bodyBlock(body, ctx) {
     lines.push('e = ' + orbit.e);
   }
   if (body.lagrange && body.lagrange.point) lines.push(String(body.lagrange.point));
+  if (angleIsMissing(body)) lines.push('Start angle is not set');
   (ctx.system.bodies || []).filter(function (item) { return item.parent === body.id; }).slice(0, 6).forEach(function (item) {
     lines.push(item.name);
   });

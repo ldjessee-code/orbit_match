@@ -270,9 +270,22 @@ function bandInnerOuterKm(band) {
   return { innerKm: taggedValue(band.r_in_km), outerKm: taggedValue(band.r_out_km) };
 }
 
+function ringSeedOffset(id) {
+  if (id === 'tc6') return 0;
+  if (id === 'tc7') return 20;
+  if (id === 'tc8') return 40;
+  const text = String(id == null ? '' : id);
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) hash = (hash * 33 + text.charCodeAt(i)) >>> 0;
+  return 100 + (hash % 9000);
+}
+
 export function planetRingsFromScene(system, scene) {
   const list = [];
   const sceneBodies = (scene && scene.bodies) || [];
+  const closeFrame = !!(scene && scene.frame && scene.frame !== 'system' && Number(scene.extentKm) > 0 && Number(scene.closeSpan) > 0);
+  const extent = closeFrame ? Number(scene.extentKm) : 0;
+  const span = closeFrame ? Number(scene.closeSpan) : 0;
   ((system && system.bodies) || []).forEach(function (src) {
     const ringSys = src.ring_system;
     if (!ringSys || !Array.isArray(ringSys.bands)) return;
@@ -286,14 +299,14 @@ export function planetRingsFromScene(system, scene) {
       if (/gap/i.test(name) || name === 'phoebe_like') return;
       const km = bandInnerOuterKm(band);
       if (!(km.innerKm > 0) || !(km.outerKm > km.innerKm)) return;
-      let innerR = ringKmToScene(km.innerKm, planetKm, display);
-      let outerR = ringKmToScene(km.outerKm, planetKm, display);
+      let innerR = closeFrame ? (km.innerKm / extent) * span : ringKmToScene(km.innerKm, planetKm, display);
+      let outerR = closeFrame ? (km.outerKm / extent) * span : ringKmToScene(km.outerKm, planetKm, display);
       if (outerR < innerR) {
         const swap = innerR;
         innerR = outerR;
         outerR = swap;
       }
-      if (outerR - innerR < 0.004) {
+      if (!closeFrame && outerR - innerR < 0.004) {
         const mid = (innerR + outerR) / 2;
         innerR = mid - 0.002;
         outerR = mid + 0.002;
@@ -313,7 +326,7 @@ export function planetRingsFromScene(system, scene) {
         outerRadius: outerR,
         thickness: thickness,
         inclination: 0,
-        seed: SKY_SEED + 200 + index + (src.id === 'tc6' ? 0 : src.id === 'tc7' ? 20 : 40),
+        seed: SKY_SEED + 200 + index + ringSeedOffset(src.id),
         density: DENSITY_DEFAULT,
         dustiness: tauToDustiness(band.tau),
         countShare: tauToCountShare(band.tau),

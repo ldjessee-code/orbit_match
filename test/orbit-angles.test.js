@@ -369,7 +369,7 @@ test('builder link round-trips epoch, reference direction, and both planet angle
   assert.equal(kept.au, '0.71');
 });
 
-test('viewers place a new-angle planet on the typed direction and leave an old system spaced by index', async function () {
+test('viewers place a new-angle planet on the typed direction and an old system at 0 degrees', async function () {
   const schema = await import('../site/js/schema.js');
   const model = await import('../site/viewer3d/scene-model.js');
   const draw = await import('../site/js/render-svg.js');
@@ -389,19 +389,31 @@ test('viewers place a new-angle planet on the typed direction and leave an old s
     star: { name: 'Old', mass_solar: 1 },
     bodies: [
       { id: 'a', name: 'A', kind: 'planet', orbit: { a_au: 1, e: 0, period_days: 365 } },
-      { id: 'b', name: 'B', kind: 'planet', orbit: { a_au: 2, e: 0, period_days: 700 } }
+      { id: 'b', name: 'B', kind: 'planet', orbit: { a_au: 2, e: 0, period_days: 700 } },
+      { id: 'gate', name: 'Gate', kind: 'structure', parent: null, orbit: { a_au: 2, e: 0, period_days: 700 }, lagrange: { of: 'b', point: 'L4' } }
     ]
   });
   const oldScene = model.buildScene(legacy, view);
   const a = oldScene.bodies.find(function (body) { return body.id === 'a'; });
   const b = oldScene.bodies.find(function (body) { return body.id === 'b'; });
+  const gate = oldScene.bodies.find(function (body) { return body.id === 'gate'; });
   assert.ok(a.position.x > 0, String(a.position.x));
   assert.ok(Math.abs(a.position.z) < 1e-6, String(a.position.z));
-  assert.ok(b.position.x < 0, String(b.position.x));
+  assert.equal(a.angle_missing, true);
+  assert.ok(b.position.x > 0, String(b.position.x));
   assert.ok(Math.abs(b.position.z) < 1e-6, String(b.position.z));
+  assert.equal(b.angle_missing, true);
+  const gateAngle = Math.atan2(-gate.position.z, gate.position.x);
+  assert.ok(Math.abs(gateAngle - Math.PI / 3) < 1e-6, String(gateAngle));
   const ra = Math.hypot(a.position.x, a.position.z);
   const rb = Math.hypot(b.position.x, b.position.z);
   assert.ok(Math.abs(rb / ra - 2) < 1e-6, String(rb / ra));
+  const svgLegacy = draw.renderSvg(legacy, view, empire, quiet);
+  const diskA = svgLegacy.match(/<circle\b[^>]*\bdata-id="a"[^>]*>/);
+  const diskB = svgLegacy.match(/<circle\b[^>]*\bdata-id="b"[^>]*>/);
+  assert.ok(diskA && diskB, 'legacy disks');
+  assert.ok(Number(diskA[0].match(/\bcx="([^"]+)"/)[1]) > 800);
+  assert.ok(Number(diskB[0].match(/\bcx="([^"]+)"/)[1]) > 800);
   const fresh = schema.loadSystem(readJson('test/fixtures/made-up-angles.system.json'));
   const scene = model.buildScene(fresh, view);
   const demo = scene.bodies.find(function (body) { return body.id === 'demo'; });
@@ -443,4 +455,148 @@ test('the builder page can enter or randomize both angles', function () {
   assert.match(manual, /randomize-all/);
   assert.match(manual, /parseAngleDeg/);
   assert.match(manual, /systemRecordFromManual/);
+});
+
+test('moon form has both angle inputs', function () {
+  const manual = read('site/manual/manual.js');
+  const page = read('site/manual/index.html');
+  assert.match(manual, /data-moon-field="position_angle_deg"/);
+  assert.match(manual, /data-moon-field="perihelion_longitude_deg"/);
+  assert.match(manual, /random-moon-position/);
+  assert.match(manual, /random-moon-perihelion/);
+  assert.match(page, /every moon/);
+  assert.match(page, /Belts stay blank/);
+});
+
+test('randomize all sets a moon angle and skips a belt', async function () {
+  const link = await import('../site/js/builder-link.js');
+  const manual = read('site/manual/manual.js');
+  assert.equal(typeof link.randomizeManualAngles, 'function');
+  assert.match(manual, /randomizeManualAngles/);
+  assert.doesNotMatch(manual, /kind === "moon" \|\| body\.kind === "belt"/);
+  let n = 0;
+  const rolls = [12.5, 40, 70.25, 80, 3, 4];
+  const rows = [
+    {
+      id: 'p',
+      kind: 'planet',
+      position_angle_deg: '',
+      perihelion_longitude_deg: '',
+      moons: [{ id: 'm', kind: 'moon', position_angle_deg: '', perihelion_longitude_deg: '' }]
+    },
+    { id: 'b', kind: 'belt', position_angle_deg: '', perihelion_longitude_deg: '', moons: [] },
+    { id: 'lone', kind: 'moon', position_angle_deg: '', perihelion_longitude_deg: '' }
+  ];
+  const after = link.randomizeManualAngles(rows, function () { return rolls[n++]; });
+  assert.equal(after[0].position_angle_deg, '12.50');
+  assert.equal(after[0].perihelion_longitude_deg, '40.00');
+  assert.equal(after[0].moons[0].position_angle_deg, '70.25');
+  assert.equal(after[0].moons[0].perihelion_longitude_deg, '80.00');
+  assert.equal(after[1].position_angle_deg, '');
+  assert.equal(after[1].perihelion_longitude_deg, '');
+  assert.equal(after[2].position_angle_deg, '3.00');
+  assert.equal(after[2].perihelion_longitude_deg, '4.00');
+  assert.equal(rows[0].position_angle_deg, '');
+  assert.equal(rows[0].moons[0].position_angle_deg, '');
+  const header = {
+    hostname: 'Demo',
+    epoch: '',
+    reference_label: 'toward the vernal point / arbitrary',
+    reference_deg: '0'
+  };
+  const saved = link.systemRecordFromManual(header, [{
+    id: 'p1',
+    kind: 'planet',
+    name: 'Host',
+    period: '10',
+    unit: 'days',
+    au: '1',
+    moons: [{
+      id: 'm1',
+      kind: 'moon',
+      name: 'Pebble',
+      period: '2',
+      unit: 'days',
+      distanceKm: '10000',
+      position_angle_deg: '360',
+      perihelion_longitude_deg: '15.5'
+    }]
+  }]);
+  assert.equal(saved.bodies[0].moons[0].position_angle_deg, 0);
+  assert.equal(saved.bodies[0].moons[0].perihelion_longitude_deg, 15.5);
+  const schema = await import('../site/js/schema.js');
+  const loaded = schema.loadSystem(saved);
+  const moon = loaded.bodies.find(function (body) { return body.id === 'm1'; });
+  assert.equal(moon.parent, 'p1');
+  assert.equal(moon.orbit.position_angle_deg, 0);
+  assert.equal(moon.orbit.perihelion_longitude_deg, 15.5);
+  assert.equal(moon.orbit.a_km, 10000);
+  const back = link.manualBodyFromSystem(moon);
+  assert.equal(back.position_angle_deg, '0');
+  assert.equal(back.perihelion_longitude_deg, '15.5');
+  assert.throws(function () {
+    link.systemRecordFromManual(header, [{
+      id: 'p2',
+      moons: [{ id: 'bad', position_angle_deg: 'east', perihelion_longitude_deg: '1' }]
+    }]);
+  }, /position_angle_deg/);
+});
+
+test('a missing angle is flagged and is not written', async function () {
+  const schema = await import('../site/js/schema.js');
+  const model = await import('../site/viewer3d/scene-model.js');
+  const draw = await import('../site/js/render-svg.js');
+  const system = schema.loadSystem(readJson('site/data/tau-ceti.system.json'));
+  const view = schema.loadView(readJson('site/data/tau-ceti.view.json'));
+  const before = JSON.stringify(system);
+  const close = model.buildScene(system, view, { frame: 'tc5' });
+  const shudder = close.bodies.find(function (body) { return body.id === 'tc5a'; });
+  assert.equal(shudder.angle_missing, true);
+  assert.ok(shudder.position.x > 0, String(shudder.position.x));
+  assert.ok(Math.abs(shudder.position.z) < 1e-6, String(shudder.position.z));
+  assert.equal(JSON.stringify(system), before);
+  const stored = system.bodies.find(function (body) { return body.id === 'tc5a'; });
+  assert.equal(stored.orbit.position_angle_deg, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(stored, 'angle_deg'), false);
+  const half = model.buildScene(system, Object.assign({}, view, { epoch_days: 6.607 / 2 }), { frame: 'tc5' });
+  const moved = half.bodies.find(function (body) { return body.id === 'tc5a'; });
+  assert.ok(Math.hypot(moved.position.x - shudder.position.x, moved.position.z - shudder.position.z) > 0.05);
+  const full = model.buildScene(system, Object.assign({}, view, { epoch_days: 6.607 }), { frame: 'tc5' });
+  const back = full.bodies.find(function (body) { return body.id === 'tc5a'; });
+  assert.ok(Math.hypot(back.position.x - shudder.position.x, back.position.z - shudder.position.z) < 1e-4);
+  assert.match(model.infoLines(system, 'tc5a').join('\n'), /Start angle is not set/);
+  assert.doesNotMatch(model.infoLines(system, 'yard').join('\n'), /Start angle is not set/);
+  const quiet = readJson('site/themes/quiet.json');
+  const empire = readJson('site/themes/empire.json');
+  const cardView = Object.assign({}, view, { callouts: ['body:tc5a'] });
+  const svg = draw.renderSvg(system, cardView, empire, quiet, { frame: 'tc5' });
+  assert.match(svg, /Start angle is not set/);
+});
+
+test("Yard's angle_deg 110 is the start angle", async function () {
+  const schema = await import('../site/js/schema.js');
+  const model = await import('../site/viewer3d/scene-model.js');
+  const draw = await import('../site/js/render-svg.js');
+  const system = schema.loadSystem(readJson('site/data/tau-ceti.system.json'));
+  const view = schema.loadView(readJson('site/data/tau-ceti.view.json'));
+  const yardBody = system.bodies.find(function (body) { return body.id === 'yard'; });
+  assert.equal(yardBody.angle_deg, 110);
+  assert.equal(yardBody.canon.angle_deg, 'locked');
+  assert.equal(yardBody.orbit.position_angle_deg, undefined);
+  const before = JSON.stringify(yardBody);
+  const close = model.buildScene(system, view, { frame: 'tc5' });
+  const yard = close.bodies.find(function (body) { return body.id === 'yard'; });
+  assert.equal(yard.angle_missing, false);
+  const angle = Math.atan2(-yard.position.z, yard.position.x);
+  assert.ok(Math.abs(angle - (110 * Math.PI) / 180) < 1e-6, String(angle));
+  assert.equal(JSON.stringify(yardBody), before);
+  const quiet = readJson('site/themes/quiet.json');
+  const empire = readJson('site/themes/empire.json');
+  const svg = draw.renderSvg(system, view, empire, quiet, { frame: 'tc5' });
+  const disk = svg.match(/<circle\b[^>]*\bdata-id="yard"[^>]*>/);
+  assert.ok(disk, 'yard disk');
+  const cx = Number(disk[0].match(/\bcx="([^"]+)"/)[1]);
+  const cy = Number(disk[0].match(/\bcy="([^"]+)"/)[1]);
+  assert.ok(cx < 820, String(cx));
+  assert.ok(cy < 530, String(cy));
 });

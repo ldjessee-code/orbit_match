@@ -312,3 +312,68 @@ test('Cue Ball has exactly one ring source: the data-driven ring-belt', async fu
   assert.match(rebuild[0], /solidRingForBody/);
   assert.doesNotMatch(rebuild[0], /if \(body\.rings\) \{\s*const ring = new THREE\.Mesh\(\s*new THREE\.RingGeometry/);
 });
+
+test('close-frame rings use the kilometre extent, not the glyph radius', async function () {
+  const schema = await import('../site/js/schema.js');
+  const model = await import('../site/viewer3d/scene-model.js');
+  const rings = await import('../site/viewer3d/ring-belt.js');
+  const system = schema.loadSystem(readJson('site/data/tau-ceti.system.json'));
+  const view = schema.loadView(readJson('site/data/tau-ceti.view.json'));
+  const systemScene = model.buildScene(system, view);
+  const systemRings = rings.planetRingsFromScene(system, systemScene);
+  const systemF = systemRings.find(function (item) { return item.id === 'tc7-F'; });
+  assert.ok(systemF, 'system F ring');
+  assert.ok(Math.abs((systemF.outerRadius - systemF.innerRadius) - 0.004) < 1e-9, String(systemF.outerRadius - systemF.innerRadius));
+  const close = model.buildScene(system, view, { frame: 'tc7' });
+  assert.ok(close.extentKm >= 172200, String(close.extentKm));
+  assert.equal(close.frame, 'tc7');
+  const focus = close.bodies.find(function (item) { return item.id === 'tc7'; });
+  const configs = rings.planetRingsFromScene(system, close);
+  const bandA = configs.find(function (item) { return item.id === 'tc7-A'; });
+  const bandF = configs.find(function (item) { return item.id === 'tc7-F'; });
+  assert.ok(bandA && bandF, 'close bands');
+  const span = close.closeSpan;
+  assert.ok(Math.abs(bandA.outerRadius - (64000 / close.extentKm) * span) < 1e-6, String(bandA.outerRadius));
+  assert.ok(Math.abs(focus.radius - (24600 / close.extentKm) * span) < 1e-6, String(focus.radius));
+  assert.ok(Math.abs(bandA.outerRadius / focus.radius - 64000 / 24600) < 1e-6);
+  const width = bandF.outerRadius - bandF.innerRadius;
+  assert.ok(Math.abs(width - (50 / close.extentKm) * span) < 1e-6, String(width));
+  assert.ok(Math.abs(width - 0.004) > 1e-4, String(width));
+  assert.equal(configs.some(function (item) { return item.id === 'tc7-cassini_like_gap'; }), false);
+});
+
+test('phoebe_like stays out of the extent', async function () {
+  const schema = await import('../site/js/schema.js');
+  const model = await import('../site/viewer3d/scene-model.js');
+  const rings = await import('../site/viewer3d/ring-belt.js');
+  const system = schema.loadSystem(readJson('site/data/tau-ceti.system.json'));
+  const view = schema.loadView(readJson('site/data/tau-ceti.view.json'));
+  const extent = model.closeExtentKm(system, 'tc8');
+  assert.ok(Math.abs(extent - 53900) < 1e-6, String(extent));
+  assert.ok(extent < 1e6, String(extent));
+  const close = model.buildScene(system, view, { frame: 'tc8' });
+  assert.ok(Math.abs(close.extentKm - 53900) < 1e-6, String(close.extentKm));
+  const configs = rings.planetRingsFromScene(system, close);
+  assert.equal(configs.some(function (item) { return /phoebe/i.test(item.id) || /phoebe/i.test(item.name); }), false);
+  const dust = configs.find(function (item) { return item.id === 'tc8-inner_dust'; });
+  assert.ok(dust, 'inner dust');
+  assert.ok(Math.abs(dust.outerRadius - (53900 / close.extentKm) * close.closeSpan) < 1e-6, String(dust.outerRadius));
+});
+
+test('a ring moonlet is a marker, not a body', async function () {
+  const schema = await import('../site/js/schema.js');
+  const model = await import('../site/viewer3d/scene-model.js');
+  const system = schema.loadSystem(readJson('site/data/tau-ceti.system.json'));
+  const view = schema.loadView(readJson('site/data/tau-ceti.view.json'));
+  const count = system.bodies.length;
+  const close = model.buildScene(system, view, { frame: 'tc6' });
+  assert.equal(system.bodies.length, count);
+  assert.equal(close.bodies.length, 1);
+  assert.equal(close.bodies[0].id, 'tc6');
+  assert.ok(Array.isArray(close.moonlets));
+  const marker = close.moonlets.find(function (item) { return Math.abs(item.a_km - 100100) < 1e-6; });
+  assert.ok(marker, 'moonlet 100100');
+  const sceneR = Math.hypot(marker.position.x, marker.position.z);
+  assert.ok(Math.abs(sceneR - (100100 / close.extentKm) * close.closeSpan) < 1e-6, String(sceneR));
+  assert.equal(close.bodies.some(function (body) { return body.a_km === 100100; }), false);
+});

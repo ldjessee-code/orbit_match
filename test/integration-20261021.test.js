@@ -161,17 +161,17 @@ test('sky path and tilt come from system data and default to identity', async fu
   assert.equal(fs.existsSync(path.join(root, 'site/viewer3d/sky/cube')), true);
 });
 
-test('low-resource choice is URL, then storage, then heuristics', async function () {
+test('low-resource choice is the URL, then the page you opened', async function () {
   const gate = await import('../site/js/low-resource.js');
   assert.equal(gate.RESOURCE_STORAGE_KEY, 'orbit-match-viewer-mode');
   assert.equal(gate.chooseViewer({ search: '?view=svg', stored: '3d', signals: {} }).mode, 'svg');
   assert.equal(gate.chooseViewer({ search: '?view=svg', stored: '3d', signals: {} }).source, 'url');
   assert.equal(gate.chooseViewer({ search: 'low=0', stored: 'svg', signals: { webgl: false } }).mode, '3d');
   assert.equal(gate.chooseViewer({ search: '?view=2d' }).mode, 'svg');
-  assert.equal(gate.chooseViewer({ search: '', stored: 'svg', signals: { webgl: true, deviceMemory: 8 } }).source, 'storage');
-  assert.equal(gate.chooseViewer({ search: '', stored: 'svg' }).mode, 'svg');
+  assert.equal(gate.chooseViewer({ search: '', stored: 'svg', signals: { webgl: true, deviceMemory: 8 } }).source, 'page');
+  assert.equal(gate.chooseViewer({ search: '', stored: 'svg' }).mode, '3d');
   assert.equal(gate.chooseViewer({ signals: {} }).mode, '3d');
-  assert.equal(gate.chooseViewer({ signals: {} }).source, 'auto');
+  assert.equal(gate.chooseViewer({ signals: {} }).source, 'page');
   assert.equal(gate.detectLowResource({}), false);
   assert.equal(gate.detectLowResource({ webgl: false }), true);
   assert.equal(gate.detectLowResource({ saveData: true }), true);
@@ -187,9 +187,10 @@ test('low-resource choice is URL, then storage, then heuristics', async function
 
   let probed = false;
   const forced = gate.decideViewer({
+    page: 'svg',
     search: '?view=3d',
     stored: 'svg',
-    signals: { saveData: true },
+    signals: { saveData: true, webgl: false },
     probe: function () { probed = true; return { webgl: false }; }
   });
   assert.equal(forced.mode, '3d');
@@ -197,21 +198,25 @@ test('low-resource choice is URL, then storage, then heuristics', async function
   assert.equal(probed, false);
 
   probed = false;
-  const early = gate.decideViewer({
+  const saveDataStays = gate.decideViewer({
+    page: '3d',
     search: '',
-    signals: { saveData: true },
-    probe: function () { probed = true; return { webgl: true, maxTextureSize: 8192 }; }
+    stored: 'svg',
+    signals: { saveData: true, webgl: true },
+    probe: function () { probed = true; return { webgl: false }; }
   });
-  assert.equal(early.mode, 'svg');
+  assert.equal(saveDataStays.mode, '3d');
+  assert.equal(saveDataStays.source, 'page');
   assert.equal(probed, false);
 
   const probedChoice = gate.decideViewer({
+    page: '3d',
     search: '',
     signals: { hardwareConcurrency: 8, deviceMemory: 8 },
     probe: function () { return { webgl: false, maxTextureSize: 8192 }; }
   });
   assert.equal(probedChoice.mode, 'svg');
-  assert.equal(probedChoice.source, 'auto');
+  assert.equal(probedChoice.source, 'webgl');
 
   const dest = gate.resourceDestination('3d', { mode: 'svg' }, 'system=tau-ceti.system.json&low=1');
   assert.equal(dest, '../viewer/?system=tau-ceti.system.json&view=svg');
@@ -238,9 +243,102 @@ test('low-resource choice is URL, then storage, then heuristics', async function
   assert.match(clientSvg, /writeResourceStorage\('3d'\)/);
   assert.match(client3d, /decideViewer/);
   assert.match(clientSvg, /decideViewer/);
-  assert.match(clientSvg, /probed\.webgl === false/);
+  assert.match(clientSvg, /page: 'svg'/);
+  assert.match(client3d, /page: '3d'/);
+  assert.doesNotMatch(clientSvg, /probed\.webgl === false/);
+  assert.match(read('site/js/low-resource.js'), /ignores localStorage/);
   assert.match(read('site/index.html'), /viewer\/\?view=svg/);
   assert.match(page3d, /href="\.\.\/viewer\/\?view=svg"/);
+});
+
+test('the folder you opened stays put unless the URL or a dead WebGL probe says otherwise', async function () {
+  const gate = await import('../site/js/low-resource.js');
+  const capable = { webgl: true, deviceMemory: 8, hardwareConcurrency: 8, maxTextureSize: 8192 };
+
+  let probed = false;
+  const svgEmpty = gate.decideViewer({
+    page: 'svg',
+    search: '',
+    stored: null,
+    signals: capable,
+    probe: function () { probed = true; return { webgl: true }; }
+  });
+  assert.equal(svgEmpty.mode, 'svg');
+  assert.equal(svgEmpty.source, 'page');
+  assert.equal(probed, false);
+  assert.equal(gate.resourceDestination('svg', svgEmpty, ''), null);
+
+  probed = false;
+  const svgStored = gate.decideViewer({
+    page: 'svg',
+    search: '',
+    stored: '3d',
+    signals: capable,
+    probe: function () { probed = true; return { webgl: true }; }
+  });
+  assert.equal(svgStored.mode, 'svg');
+  assert.equal(svgStored.source, 'page');
+  assert.equal(probed, false);
+  assert.equal(gate.resourceDestination('svg', svgStored, ''), null);
+
+  probed = false;
+  const threeStored = gate.decideViewer({
+    page: '3d',
+    search: '',
+    stored: 'svg',
+    signals: { deviceMemory: 8, hardwareConcurrency: 8 },
+    probe: function () { probed = true; return { webgl: true, maxTextureSize: 8192 }; }
+  });
+  assert.equal(threeStored.mode, '3d');
+  assert.equal(threeStored.source, 'page');
+  assert.equal(probed, true);
+  assert.equal(gate.resourceDestination('3d', threeStored, ''), null);
+
+  probed = false;
+  const threeNoGl = gate.decideViewer({
+    page: '3d',
+    search: '',
+    stored: '3d',
+    signals: {},
+    probe: function () { probed = true; return { webgl: false, maxTextureSize: null }; }
+  });
+  assert.equal(threeNoGl.mode, 'svg');
+  assert.equal(threeNoGl.source, 'webgl');
+  assert.equal(probed, true);
+  assert.equal(gate.resourceDestination('3d', threeNoGl, ''), '../viewer/?view=svg');
+
+  const explicit3d = gate.decideViewer({
+    page: 'svg',
+    search: '?view=3d',
+    stored: 'svg',
+    signals: { webgl: false }
+  });
+  assert.equal(explicit3d.mode, '3d');
+  assert.equal(explicit3d.source, 'url');
+  assert.equal(gate.resourceDestination('svg', explicit3d, '?view=3d'), '../viewer3d/?view=3d');
+
+  const explicitSvg = gate.decideViewer({
+    page: '3d',
+    search: '?view=svg',
+    stored: '3d',
+    signals: capable
+  });
+  assert.equal(explicitSvg.mode, 'svg');
+  assert.equal(explicitSvg.source, 'url');
+  assert.equal(gate.resourceDestination('3d', explicitSvg, '?view=svg'), '../viewer/?view=svg');
+
+  const staySvg = gate.decideViewer({ page: 'svg', search: '?view=svg', stored: '3d', signals: capable });
+  assert.equal(staySvg.mode, 'svg');
+  assert.equal(gate.resourceDestination('svg', staySvg, '?view=svg'), null);
+
+  const stay3d = gate.decideViewer({ page: '3d', search: '?view=3d', stored: 'svg', signals: { webgl: false } });
+  assert.equal(stay3d.mode, '3d');
+  assert.equal(gate.resourceDestination('3d', stay3d, '?view=3d'), null);
+
+  assert.equal(gate.decideViewer({ page: 'svg', search: '?low=0', signals: { webgl: false } }).mode, '3d');
+  assert.equal(gate.decideViewer({ page: '3d', search: 'low=1', signals: capable }).mode, 'svg');
+  assert.equal(gate.resourceDestination('3d', { mode: 'svg' }, 'system=tau-ceti.system.json&low=1'), '../viewer/?system=tau-ceti.system.json&view=svg');
+  assert.equal(gate.resourceDestination('svg', { mode: '3d' }, 'view=svg'), '../viewer3d/?view=3d');
 });
 
 test('lore settings are built from data, collapsed, and belts stay data-driven', async function () {

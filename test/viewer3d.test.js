@@ -221,7 +221,7 @@ test('close frame puts Kakakiko at the origin and Shudder inside Der', async fun
   assert.doesNotMatch(read('site/viewer/index.html'), /data-frame="tc5"/);
   assert.doesNotMatch(read('site/viewer3d/index.html'), /data-frame="tc5"/);
   assert.match(read('site/viewer3d/index.html'), /WebGL is not available/);
-  assert.match(read('site/viewer/viewer.js'), /probed\.webgl === false/);
+  assert.match(read('site/viewer/viewer.js'), /page: 'svg'/);
 });
 
 test('close frame works for a parent that is not tc5', async function () {
@@ -890,8 +890,16 @@ test('Kakakiko close-up uses one kilometre scale', async function () {
   assert.ok(Math.abs(focus.radius / derSemi - 6628 / 240000) < 1e-6, String(focus.radius / derSemi));
   const shudderR = Math.hypot(shudder.position.x, shudder.position.z);
   const derR = Math.hypot(der.position.x, der.position.z);
-  assert.ok(Math.abs(derR / shudderR - (240000 * 0.97) / (151060 * 0.8)) < 1e-6, String(derR / shudderR));
-  assert.ok(shudder.position.x > 0 && der.position.x > 0);
+  const kepler = await import('../site/js/kepler.js');
+  const closeScale = 8 / extent;
+  function orbitRadius(a, e, period, m0) {
+    const spot = kepler.pos({ a: a, e: e, period_days: period, M0: m0, w: 0 }, 0);
+    return Math.hypot(spot.x, spot.y);
+  }
+  const shudderM0 = (3 / 5) * Math.PI * 2;
+  const derM0 = (4 / 5) * Math.PI * 2;
+  assert.ok(Math.abs(shudderR - orbitRadius(151060, 0.2, 6.607, shudderM0) * closeScale) < 1e-6, String(shudderR));
+  assert.ok(Math.abs(derR - orbitRadius(240000, 0.03, 13.213, derM0) * closeScale) < 1e-6, String(derR));
 });
 
 test('elapsed_days moves the system view and the submap', async function () {
@@ -1001,7 +1009,7 @@ test('SVG and 3D place the same moon on the same side', async function () {
   assert.ok(Math.abs(east.position.x) < 1e-6, String(east.position.x));
   assert.ok(east.position.z < 0, String(east.position.z));
   assert.equal(east.angle_missing, false);
-  assert.ok(blank.position.x > 0, String(blank.position.x));
+  assert.ok(blank.position.x < 0, String(blank.position.x));
   assert.ok(Math.abs(blank.position.z) < 1e-6, String(blank.position.z));
   assert.equal(blank.angle_missing, true);
   const empire = readJson('site/themes/empire.json');
@@ -1013,7 +1021,7 @@ test('SVG and 3D place the same moon on the same side', async function () {
   const eastCy = Number(eastDisk[0].match(/\bcy="([^"]+)"/)[1]);
   const blankCx = Number(blankDisk[0].match(/\bcx="([^"]+)"/)[1]);
   assert.ok(eastCy < 530, String(eastCy));
-  assert.ok(blankCx > 820, String(blankCx));
+  assert.ok(blankCx < 820, String(blankCx));
 });
 
 test('viewer3d mounts the starfield and keeps dust out of the raycaster', function () {

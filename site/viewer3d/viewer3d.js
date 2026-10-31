@@ -1294,6 +1294,7 @@ function bindResourceToggle() {
 async function boot() {
   if (typeof document === 'undefined') return;
   const choice = decideViewer({
+    page: '3d',
     search: location.search,
     stored: readResourceStorage(),
     signals: collectBrowserSignals(),

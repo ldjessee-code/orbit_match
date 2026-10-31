@@ -1,15 +1,23 @@
-// Low-resource gate. Capable browsers stay on the 3D viewer. The SVG viewer is the low-power page.
+// Which viewer stays on screen.
 //
-// Heuristics (any one match selects SVG when the URL and localStorage have not chosen):
+// An explicit URL wins on either page. view=svg, view=2d, or low=1 selects SVG.
+// view=3d or low=0 selects 3D.
+// With no view and no low parameter, the folder you opened stays:
+// viewer/ stays on SVG, and viewer3d/ stays on 3D.
+// The one exception is viewer3d/ when the probe reports webgl === false.
+// That page then opens the SVG viewer.
+// This decision ignores localStorage key orbit-match-viewer-mode.
+// The switch button may still write that key. It also puts view= in the URL,
+// so the next load is an explicit choice.
+//
+// detectLowResource still reports the old heuristics. Any one match is low:
 // - WebGL is unavailable (webgl === false).
 // - navigator.connection.saveData is true.
 // - navigator.deviceMemory is a positive number and <= 2 (gigabytes). Missing or 0 is ignored.
 // - navigator.hardwareConcurrency is a positive number and <= 2. Missing or 0 is ignored.
 // - matchMedia('(prefers-reduced-motion: reduce)') matches.
 // - WebGL MAX_TEXTURE_SIZE is a positive number below 4096 (the 4k sky needs 4096).
-//
-// Choice order: URL (view=3d|svg or low=0|1), then localStorage key orbit-match-viewer-mode,
-// then the heuristics. No matching signal means 3D.
+// Only webgl === false changes the open page, and only on viewer3d/ when the URL is silent.
 
 export const RESOURCE_STORAGE_KEY = 'orbit-match-viewer-mode';
 
@@ -43,25 +51,29 @@ export function chooseViewer(input) {
   const src = input || {};
   const url = urlViewerMode(src.search || '');
   if (url) return { mode: url, source: 'url', low: url === 'svg' };
-  const stored = storedViewerMode(src.stored);
-  if (stored) return { mode: stored, source: 'storage', low: stored === 'svg' };
-  const low = detectLowResource(src.signals);
-  return { mode: low ? 'svg' : '3d', source: 'auto', low: low };
+  const page = src.page === 'svg' || src.page === '3d' ? src.page : null;
+  if (page === '3d' && src.signals && src.signals.webgl === false) {
+    return { mode: 'svg', source: 'webgl', low: true };
+  }
+  if (page === 'svg') return { mode: 'svg', source: 'page', low: true };
+  return { mode: '3d', source: 'page', low: false };
 }
 
 export function decideViewer(env) {
   const src = env || {};
   const search = src.search || '';
+  const page = src.page;
   const storedRaw = src.stored;
-  if (urlViewerMode(search) || storedViewerMode(storedRaw)) {
-    return chooseViewer({ search: search, stored: storedRaw, signals: src.signals || {} });
+  if (urlViewerMode(search)) {
+    return chooseViewer({ search: search, page: page, stored: storedRaw, signals: src.signals || {} });
   }
   let signals = Object.assign({}, src.signals || {});
-  const early = chooseViewer({ search: search, stored: storedRaw, signals: signals });
-  if (early.mode === 'svg' || typeof src.probe !== 'function') return early;
-  const extra = src.probe() || {};
-  signals = Object.assign({}, signals, extra);
-  return chooseViewer({ search: search, stored: storedRaw, signals: signals });
+  const knownWebgl = signals.webgl === true || signals.webgl === false;
+  if (page === '3d' && !knownWebgl && typeof src.probe === 'function') {
+    const extra = src.probe() || {};
+    signals = Object.assign({}, signals, extra);
+  }
+  return chooseViewer({ search: search, page: page, stored: storedRaw, signals: signals });
 }
 
 export function resourceDestination(page, choice, search) {

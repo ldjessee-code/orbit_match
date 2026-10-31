@@ -176,14 +176,12 @@ function probeWebgl() {
 
 function stayOnSvg() {
   if (typeof location === 'undefined') return true;
-  const probed = probeWebgl();
-  // A browser with no WebGL cannot draw the 3D page. Stay here even if storage asked for 3D.
-  if (probed.webgl === false) return true;
   const choice = decideViewer({
+    page: 'svg',
     search: location.search,
     stored: readResourceStorage(),
     signals: collectBrowserSignals(),
-    probe: function () { return probed; }
+    probe: probeWebgl
   });
   const dest = resourceDestination('svg', choice, location.search);
   if (!dest) return true;

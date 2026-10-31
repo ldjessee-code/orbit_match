@@ -1,3 +1,5 @@
+import { parseAngleDeg, randomAngleDeg } from './kepler.js';
+
 export const VIEWER_SYSTEM_ID = 'tau-ceti';
 export const STAR_OBJECT_ID = 'star';
 export const OPEN_LABEL = 'Open in Orbital Object Details';
@@ -73,6 +75,117 @@ export function cardLinks(spec) {
   }];
 }
 
+function angleText(value) {
+  if (value == null || value === '') return null;
+  const parsed = parseAngleDeg(value);
+  if (!parsed.ok || parsed.empty) return null;
+  return String(parsed.value);
+}
+
+function plainNum(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function exportManualBody(body) {
+  const next = Object.assign({}, body || {});
+  delete next.angle_error;
+  for (let i = 0; i < ANGLE_FIELDS.length; i++) {
+    const key = ANGLE_FIELDS[i];
+    if (next[key] == null || next[key] === '') {
+      delete next[key];
+      continue;
+    }
+    const parsed = parseAngleDeg(next[key]);
+    if (!parsed.ok || parsed.empty) throw new Error(key + ' is not a valid angle.');
+    next[key] = parsed.value;
+  }
+  if (Array.isArray(next.moons)) {
+    next.moons = next.moons.map(function (moon) { return exportManualBody(moon); });
+  }
+  return next;
+}
+
+const ANGLE_FIELDS = ['position_angle_deg', 'perihelion_longitude_deg'];
+const REFERENCE_LABEL = 'toward the vernal point / arbitrary';
+
+function epochForSave(header) {
+  const obj = header.epoch_object;
+  if (obj && typeof obj === 'object' && !Array.isArray(obj) && String(header.epoch || '') === String(obj.label || '')) {
+    return obj;
+  }
+  if (header.epoch == null) return '';
+  return String(header.epoch);
+}
+
+export function manualHeaderFromSystem(system) {
+  const src = system || {};
+  const epoch = src.epoch;
+  let text = '';
+  let epochObject = null;
+  if (typeof epoch === 'string') text = epoch;
+  else if (epoch && typeof epoch === 'object' && !Array.isArray(epoch)) {
+    epochObject = epoch;
+    text = epoch.label == null ? '' : String(epoch.label);
+  }
+  const ref = src.reference_direction;
+  let label = REFERENCE_LABEL;
+  let deg = '0';
+  if (typeof ref === 'string' && ref.trim()) label = ref.trim();
+  else if (ref && typeof ref === 'object' && !Array.isArray(ref)) {
+    if (ref.label != null && String(ref.label).trim() !== '') label = String(ref.label);
+    if (ref.deg != null && ref.deg !== '') deg = String(ref.deg);
+  }
+  return {
+    epoch: text,
+    epoch_object: epochObject,
+    reference_label: label,
+    reference_deg: deg
+  };
+}
+
+export function systemRecordFromManual(header, bodies) {
+  const h = header || {};
+  const refRaw = h.reference_deg == null || h.reference_deg === '' ? 0 : h.reference_deg;
+  const ref = parseAngleDeg(refRaw);
+  if (!ref.ok || ref.empty) throw new Error('reference_direction.deg is not a valid angle.');
+  const label = h.reference_label == null || String(h.reference_label).trim() === ''
+    ? REFERENCE_LABEL
+    : String(h.reference_label).trim();
+  return {
+    orbit_match: 1,
+    kind: 'system',
+    epoch: epochForSave(h),
+    reference_direction: { label: label, deg: ref.value },
+    star: {
+      hostname: h.hostname,
+      setting_name: h.setting_name,
+      spectype: h.spectype,
+      mass_solar: plainNum(h.mass),
+      lum_log: plainNum(h.lum),
+      teff_k: plainNum(h.teff),
+      radius_solar: plainNum(h.rad),
+      x_ly: plainNum(h.x),
+      y_ly: plainNum(h.y),
+      z_ly: plainNum(h.z)
+    },
+    known_planet_count: plainNum(h.planets),
+    card: {
+      high_concept: h.concept,
+      port: h.port || null,
+      services: h.services ? String(h.services).split(',').map(function (part) { return part.trim(); }).filter(Boolean) : [],
+      holder: h.holder,
+      fuel: h.fuel,
+      fuel_unit: h.fuel_unit
+    },
+    arrivals: (h.arrivals || []).map(function (host) { return { from_hostname: host, route_id: '' }; }),
+    bodies: (bodies || []).map(function (body) { return exportManualBody(body); })
+  };
+}
+
 export function manualBodyFromSystem(body) {
   const source = body && typeof body === 'object' ? body : {};
   const next = Object.assign({}, source);
@@ -85,6 +198,16 @@ export function manualBodyFromSystem(body) {
     next.period = String(orbit.period_days);
     if (!next.unit) next.unit = 'days';
   }
+  const posText = angleText(orbit.position_angle_deg);
+  const periText = angleText(orbit.perihelion_longitude_deg);
+  if ((next.position_angle_deg == null || next.position_angle_deg === '') && posText != null) {
+    next.position_angle_deg = posText;
+  }
+  if ((next.perihelion_longitude_deg == null || next.perihelion_longitude_deg === '') && periText != null) {
+    next.perihelion_longitude_deg = periText;
+  }
+  if (typeof next.position_angle_deg === 'number') next.position_angle_deg = String(next.position_angle_deg);
+  if (typeof next.perihelion_longitude_deg === 'number') next.perihelion_longitude_deg = String(next.perihelion_longitude_deg);
   return next;
 }
 
@@ -97,6 +220,10 @@ if (typeof window !== 'undefined') {
     parseBuilderHash: parseBuilderHash,
     focusTarget: focusTarget,
     cardLinks: cardLinks,
-    manualBodyFromSystem: manualBodyFromSystem
+    manualBodyFromSystem: manualBodyFromSystem,
+    manualHeaderFromSystem: manualHeaderFromSystem,
+    systemRecordFromManual: systemRecordFromManual,
+    parseAngleDeg: parseAngleDeg,
+    randomAngleDeg: randomAngleDeg
   };
 }

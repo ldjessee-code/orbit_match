@@ -38,7 +38,11 @@
       services: "",
       fuel: "",
       fuel_unit: "",
-      arrivals: []
+      arrivals: [],
+      epoch: "",
+      epoch_object: null,
+      reference_label: "toward the vernal point / arbitrary",
+      reference_deg: "0"
     };
   }
 
@@ -66,6 +70,8 @@
       pressure: "",
       o2: "",
       co2: "",
+      position_angle_deg: "",
+      perihelion_longitude_deg: "",
       moons: [],
       generated: !!generated
     };
@@ -117,7 +123,7 @@
     var spec = document.getElementById("spec-type");
     if (host) host.textContent = state.header.hostname || "No star yet";
     if (spec) spec.textContent = state.header.spectype || "Spectral type unknown";
-    ["setting_name", "spectype", "mass", "lum", "teff", "planets", "concept", "holder", "port", "services", "fuel", "fuel_unit"].forEach(function (key) {
+    ["setting_name", "spectype", "mass", "lum", "teff", "planets", "concept", "holder", "port", "services", "fuel", "fuel_unit", "epoch", "reference_label", "reference_deg"].forEach(function (key) {
       var input = starCard.querySelector('[data-header="' + key + '"]');
       if (input && document.activeElement !== input) input.value = state.header[key] || "";
     });
@@ -151,6 +157,15 @@
         field("Unit", '<select data-field="unit" data-help="unit"><option value="years"' + (body.unit === "years" ? " selected" : "") + '>Years</option><option value="days"' + (body.unit === "days" ? " selected" : "") + ">Days</option></select>") +
       "</div>" +
       field("Distance (AU)", '<input data-field="au" inputmode="decimal" value="' + esc(body.au) + '">') +
+      '<div class="angle-row">' +
+        field("Position at epoch (deg)", '<input data-field="position_angle_deg" inputmode="decimal" value="' + esc(body.position_angle_deg) + '">') +
+        '<button type="button" data-act="random-position">Random</button>' +
+      "</div>" +
+      '<div class="angle-row">' +
+        field("Longitude of perihelion (deg)", '<input data-field="perihelion_longitude_deg" inputmode="decimal" value="' + esc(body.perihelion_longitude_deg) + '">') +
+        '<button type="button" data-act="random-perihelion">Random</button>' +
+      "</div>" +
+      (body.angle_error ? '<p class="warn">' + esc(body.angle_error) + "</p>" : "") +
       (notes.length ? '<p class="warn">' + notes.map(esc).join(" ") + "</p>" : "") +
       "<details><summary>World facts</summary>" +
         field("Gravity", '<input data-field="gravity" value="' + esc(body.gravity) + '">') +
@@ -495,6 +510,21 @@
       saveLocal();
       return;
     }
+    if (input.dataset.field === "position_angle_deg" || input.dataset.field === "perihelion_longitude_deg") {
+      body[input.dataset.field] = input.value;
+      var parsed = angleParse(input.value);
+      body.angle_error = parsed.ok ? "" : parsed.error;
+      var warn = card.querySelector("[data-angle-error]");
+      if (!warn && !parsed.ok) {
+        warn = document.createElement("p");
+        warn.className = "warn";
+        warn.setAttribute("data-angle-error", "");
+        card.appendChild(warn);
+      }
+      if (warn) warn.textContent = parsed.ok ? "" : parsed.error;
+      saveLocal();
+      return;
+    }
     body[input.dataset.field] = input.value;
     if (input.dataset.field === "generated") return;
     body.generated = false;
@@ -569,6 +599,14 @@
       renderStack();
       saveLocal();
     }
+    if (act.dataset.act === "random-position" || act.dataset.act === "random-perihelion") {
+      var planet = bodies().find(function (item) { return item.id === id; });
+      if (!planet) return;
+      var which = act.dataset.act === "random-position" ? "position" : "peri";
+      if (!applyRandom(planet, which)) return;
+      renderStack();
+      saveLocal();
+    }
     if (act.dataset.act === "remove-moon") {
       var owner = bodies().find(function (item) { return item.id === id; });
       var moonBox = act.closest("[data-moon]");
@@ -591,38 +629,53 @@
     saveLocal();
   }
 
+  function angleApi() {
+    return window.OrbitBuilderLink || null;
+  }
+
+  function angleParse(value) {
+    var api = angleApi();
+    if (!api || !api.parseAngleDeg) return { ok: false, error: "The angle tool did not load." };
+    return api.parseAngleDeg(value);
+  }
+
+  function applyRandom(body, which) {
+    var api = angleApi();
+    if (!api || !api.randomAngleDeg) {
+      setStatus("The angle tool did not load.");
+      return false;
+    }
+    if (which === "position" || which === "both") body.position_angle_deg = api.randomAngleDeg().toFixed(2);
+    if (which === "peri" || which === "both") body.perihelion_longitude_deg = api.randomAngleDeg().toFixed(2);
+    body.angle_error = "";
+    return true;
+  }
+
+  function randomizeAll() {
+    var any = false;
+    bodies().forEach(function (body) {
+      if (body.kind === "moon" || body.kind === "belt") return;
+      if (applyRandom(body, "both")) any = true;
+    });
+    if (!any) return;
+    renderStack();
+    saveLocal();
+  }
+
   function systemRecord() {
-    return {
-      orbit_match: 1,
-      kind: "system",
-      star: {
-        hostname: state.header.hostname,
-        setting_name: state.header.setting_name,
-        spectype: state.header.spectype,
-        mass_solar: O.num(state.header.mass),
-        lum_log: O.num(state.header.lum),
-        teff_k: O.num(state.header.teff),
-        radius_solar: O.num(state.header.rad),
-        x_ly: O.num(state.header.x),
-        y_ly: O.num(state.header.y),
-        z_ly: O.num(state.header.z)
-      },
-      known_planet_count: O.num(state.header.planets),
-      card: {
-        high_concept: state.header.concept,
-        port: state.header.port || null,
-        services: state.header.services ? state.header.services.split(",").map(function (s) { return s.trim(); }).filter(Boolean) : [],
-        holder: state.header.holder,
-        fuel: state.header.fuel,
-        fuel_unit: state.header.fuel_unit
-      },
-      arrivals: (state.header.arrivals || []).map(function (host) { return { from_hostname: host, route_id: "" }; }),
-      bodies: bodies()
-    };
+    var link = angleApi();
+    if (!link || !link.systemRecordFromManual) throw new Error("The system link did not load.");
+    return link.systemRecordFromManual(state.header, bodies());
   }
 
   function saveFile() {
-    var blob = new Blob([JSON.stringify(systemRecord(), null, 2)], { type: "application/json" });
+    var record;
+    try { record = systemRecord(); }
+    catch (err) {
+      setStatus(err.message || "An angle is not a number from 0 to 360.");
+      return;
+    }
+    var blob = new Blob([JSON.stringify(record, null, 2)], { type: "application/json" });
     var link = document.createElement("a");
     var name = (state.header.hostname || "system").replace(/[^\w.-]+/g, "_");
     link.href = URL.createObjectURL(blob);
@@ -680,8 +733,15 @@
     state.header.fuel = card.fuel || "";
     state.header.fuel_unit = card.fuel_unit || "";
     state.header.arrivals = (data.arrivals || []).map(function (item) { return item.from_hostname; });
-    search.value = state.header.hostname;
     var link = window.OrbitBuilderLink;
+    if (link && link.manualHeaderFromSystem) {
+      var bits = link.manualHeaderFromSystem(data);
+      state.header.epoch = bits.epoch;
+      state.header.epoch_object = bits.epoch_object;
+      state.header.reference_label = bits.reference_label;
+      state.header.reference_deg = bits.reference_deg;
+    }
+    search.value = state.header.hostname;
     var list = (data.bodies || []).map(function (body) {
       var next = link ? link.manualBodyFromSystem(body) : body;
       next.id = next.id || uid();
@@ -762,6 +822,7 @@
   starCard.addEventListener("change", readHeader);
   document.getElementById("add-body").addEventListener("click", addBody);
   document.getElementById("save-system").addEventListener("click", saveFile);
+  document.getElementById("randomize-all").addEventListener("click", randomizeAll);
   search.addEventListener("focus", showResults);
   search.addEventListener("input", showResults);
   document.addEventListener("click", function (event) {

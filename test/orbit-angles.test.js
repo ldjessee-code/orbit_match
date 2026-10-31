@@ -369,7 +369,7 @@ test('builder link round-trips epoch, reference direction, and both planet angle
   assert.equal(kept.au, '0.71');
 });
 
-test('viewers place a new-angle planet on the typed direction and an old system at 0 degrees', async function () {
+test('viewers place a stored angle exactly and spread an old system that has none', async function () {
   const schema = await import('../site/js/schema.js');
   const model = await import('../site/viewer3d/scene-model.js');
   const draw = await import('../site/js/render-svg.js');
@@ -400,11 +400,13 @@ test('viewers place a new-angle planet on the typed direction and an old system 
   assert.ok(a.position.x > 0, String(a.position.x));
   assert.ok(Math.abs(a.position.z) < 1e-6, String(a.position.z));
   assert.equal(a.angle_missing, true);
-  assert.ok(b.position.x > 0, String(b.position.x));
-  assert.ok(Math.abs(b.position.z) < 1e-6, String(b.position.z));
+  const bAngle = Math.atan2(-b.position.z, b.position.x);
+  const bWrap = ((bAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  assert.ok(Math.abs(bWrap - (Math.PI * 2) / 3) < 1e-6, String(bAngle));
   assert.equal(b.angle_missing, true);
   const gateAngle = Math.atan2(-gate.position.z, gate.position.x);
-  assert.ok(Math.abs(gateAngle - Math.PI / 3) < 1e-6, String(gateAngle));
+  const gateGap = Math.abs(gateAngle - (bAngle + Math.PI / 3)) % (Math.PI * 2);
+  assert.ok(Math.min(gateGap, Math.PI * 2 - gateGap) < 1e-6, String(gateAngle));
   const ra = Math.hypot(a.position.x, a.position.z);
   const rb = Math.hypot(b.position.x, b.position.z);
   assert.ok(Math.abs(rb / ra - 2) < 1e-6, String(rb / ra));
@@ -413,7 +415,7 @@ test('viewers place a new-angle planet on the typed direction and an old system 
   const diskB = svgLegacy.match(/<circle\b[^>]*\bdata-id="b"[^>]*>/);
   assert.ok(diskA && diskB, 'legacy disks');
   assert.ok(Number(diskA[0].match(/\bcx="([^"]+)"/)[1]) > 800);
-  assert.ok(Number(diskB[0].match(/\bcx="([^"]+)"/)[1]) > 800);
+  assert.ok(Number(diskB[0].match(/\bcx="([^"]+)"/)[1]) < 800);
   const fresh = schema.loadSystem(readJson('test/fixtures/made-up-angles.system.json'));
   const scene = model.buildScene(fresh, view);
   const demo = scene.bodies.find(function (body) { return body.id === 'demo'; });
@@ -552,8 +554,13 @@ test('a missing angle is flagged and is not written', async function () {
   const close = model.buildScene(system, view, { frame: 'tc5' });
   const shudder = close.bodies.find(function (body) { return body.id === 'tc5a'; });
   assert.equal(shudder.angle_missing, true);
-  assert.ok(shudder.position.x > 0, String(shudder.position.x));
-  assert.ok(Math.abs(shudder.position.z) < 1e-6, String(shudder.position.z));
+  const kepler = await import('../site/js/kepler.js');
+  const shudderM0 = (3 / 5) * Math.PI * 2;
+  const shudderSpot = kepler.pos({ a: 151060, e: 0.2, period_days: 6.607, M0: shudderM0, w: 0 }, 0);
+  const shudderDrawn = Math.atan2(-shudder.position.z, shudder.position.x);
+  const shudderExpected = Math.atan2(shudderSpot.y, shudderSpot.x);
+  const shudderGap = Math.abs(shudderDrawn - shudderExpected) % (Math.PI * 2);
+  assert.ok(Math.min(shudderGap, Math.PI * 2 - shudderGap) < 1e-6, String(shudderDrawn));
   assert.equal(JSON.stringify(system), before);
   const stored = system.bodies.find(function (body) { return body.id === 'tc5a'; });
   assert.equal(stored.orbit.position_angle_deg, undefined);
@@ -565,12 +572,16 @@ test('a missing angle is flagged and is not written', async function () {
   const back = full.bodies.find(function (body) { return body.id === 'tc5a'; });
   assert.ok(Math.hypot(back.position.x - shudder.position.x, back.position.z - shudder.position.z) < 1e-4);
   assert.match(model.infoLines(system, 'tc5a').join('\n'), /Start angle is not set/);
+  assert.match(model.infoLines(system, 'tc5a').join('\n'), /spread for reading/);
+  assert.match(model.infoLines(system, 'tc5a').join('\n'), /not a canon angle/);
   assert.doesNotMatch(model.infoLines(system, 'yard').join('\n'), /Start angle is not set/);
   const quiet = readJson('site/themes/quiet.json');
   const empire = readJson('site/themes/empire.json');
   const cardView = Object.assign({}, view, { callouts: ['body:tc5a'] });
   const svg = draw.renderSvg(system, cardView, empire, quiet, { frame: 'tc5' });
   assert.match(svg, /Start angle is not set/);
+  assert.match(svg, /spread for reading/);
+  assert.match(svg, /not a canon angle/);
 });
 
 test("Yard's angle_deg 110 is the start angle", async function () {

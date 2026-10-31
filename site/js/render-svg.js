@@ -1,5 +1,6 @@
 import { pos, hohmannDays, fusionMatched, AU_M, positionFromAngles } from './kepler.js';
-import { hasSubmap, closeExtentKm, isDrawableBand, bandEdgesKm, moonletsKm, angleIsMissing, displayAngleMap } from '../viewer3d/scene-model.js';
+import { hasSubmap, closeExtentKm, isDrawableBand, bandEdgesKm, moonletsKm, angleIsMissing } from '../viewer3d/scene-model.js';
+import { displayAngleMap, ANGLE_MISSING_LINE } from './display-angles.js';
 
 const TAU = 2 * Math.PI;
 const W = 1600;
@@ -227,15 +228,13 @@ function renderSystem(system, view, theme, style) {
   return parts.join('\n');
 }
 
-function childKmSpot(system, body, tDays) {
+function childKmSpot(system, body, tDays, angles) {
   const orbit = body.orbit || {};
   const a = orbit.a_km || 0;
   const e = orbit.e > 0 ? orbit.e : 0;
   const period = orbit.period_days > 0 ? orbit.period_days : 1;
   if (usesAngle(body)) return spotAt(system, body, a, tDays, 0);
-  let m0 = 0;
-  if (typeof body.angle_deg === 'number') m0 = (body.angle_deg * Math.PI) / 180;
-  else if (typeof orbit.mean_anomaly_deg === 'number') m0 = (orbit.mean_anomaly_deg * Math.PI) / 180;
+  const m0 = angles && angles.has(body.id) ? angles.get(body.id) : 0;
   return pos({ a: a, e: e, period_days: period, M0: m0, w: 0 }, tDays);
 }
 
@@ -267,6 +266,7 @@ function renderClose(system, view, theme, style, focus) {
     return project(x, y, { cx: CX, cy: CY, scale: px, elevation_deg: elev, azimuth_deg: az });
   };
   const parts = [];
+  const angles = displayAngles(system);
   parts.push(openSvg(style, theme));
   drawCloseRings(parts, focus, px, ratio, CX, CY, style);
   const sync = children.filter(function (body) { return body.kind === 'structure' && body.orbit.a_km; });
@@ -277,7 +277,7 @@ function renderClose(system, view, theme, style, focus) {
   }
   if (layer(view, 'orbits')) {
     children.filter(function (body) { return body.kind !== 'structure'; }).forEach(function (body) {
-      drawChildOrbit(parts, body, place, px, ratio, CX, CY, style, system);
+      drawChildOrbit(parts, body, place, px, ratio, CX, CY, style, system, angles);
     });
   }
   const tDays = clockDays(view);
@@ -289,7 +289,7 @@ function renderClose(system, view, theme, style, focus) {
   children.forEach(function (body) {
     const a = body.orbit.a_km || 0;
     const e = body.orbit.e || 0;
-    const spot = childKmSpot(system, body, tDays);
+    const spot = childKmSpot(system, body, tDays, angles);
     const x = spot.x;
     const y = spot.y;
     const at = place(x, y);
@@ -335,16 +335,17 @@ function renderClose(system, view, theme, style, focus) {
   return parts.join('\n');
 }
 
-function drawChildOrbit(parts, body, place, px, ratio, cx, cy, style, system) {
+function drawChildOrbit(parts, body, place, px, ratio, cx, cy, style, system, angles) {
   const a = body.orbit.a_km || 0;
   const e = body.orbit.e || 0;
   if (e >= 0.05 && body.orbit.period_days) {
     const pts = [];
     const steps = 96;
+    const m0 = angles && angles.has(body.id) ? angles.get(body.id) : 0;
     for (let i = 0; i <= steps; i++) {
       const spot = usesAngle(body)
         ? spotAt(system, body, a, body.orbit.period_days * i / steps, 0)
-        : pos({ a: a, e: e, period_days: body.orbit.period_days, M0: 0, w: 0 }, body.orbit.period_days * i / steps);
+        : pos({ a: a, e: e, period_days: body.orbit.period_days, M0: m0, w: 0 }, body.orbit.period_days * i / steps);
       pts.push(place(spot.x, spot.y));
     }
     const d = polyline(pts);
@@ -696,7 +697,7 @@ function bodyBlock(body, ctx) {
     lines.push('e = ' + orbit.e);
   }
   if (body.lagrange && body.lagrange.point) lines.push(String(body.lagrange.point));
-  if (angleIsMissing(body)) lines.push('Start angle is not set');
+  if (angleIsMissing(body)) lines.push(ANGLE_MISSING_LINE);
   (ctx.system.bodies || []).filter(function (item) { return item.parent === body.id; }).slice(0, 6).forEach(function (item) {
     lines.push(item.name);
   });

@@ -1,4 +1,5 @@
 import { pos, hohmannDays, positionFromAngles } from '../js/kepler.js';
+import { displayAngleMap, ANGLE_MISSING_LINE } from '../js/display-angles.js';
 import { toThree, clampElevation, cameraPose } from './frame.js';
 import { hohmannArc } from './transfer-arc.js';
 
@@ -189,24 +190,7 @@ function heliocentric(system) {
   });
 }
 
-export function displayAngleMap(system) {
-  const worlds = heliocentric(system);
-  const angles = new Map();
-  worlds.forEach(function (body) {
-    const orbit = body.orbit || {};
-    let rad = 0;
-    if (typeof orbit.position_angle_deg === 'number') rad = (orbit.position_angle_deg * Math.PI) / 180;
-    else if (typeof body.angle_deg === 'number') rad = (body.angle_deg * Math.PI) / 180;
-    else if (typeof orbit.mean_anomaly_deg === 'number') rad = (orbit.mean_anomaly_deg * Math.PI) / 180;
-    angles.set(body.id, rad);
-  });
-  worlds.forEach(function (body) {
-    if (usesAngle(body)) return;
-    if (!body.lagrange || !body.lagrange.of || !angles.has(body.lagrange.of)) return;
-    angles.set(body.id, angles.get(body.lagrange.of) + Math.PI / 3);
-  });
-  return angles;
-}
+export { displayAngleMap, ANGLE_MISSING_LINE };
 
 function displayAngles(system) {
   return displayAngleMap(system);
@@ -615,17 +599,15 @@ function buildSystem(system, view, options) {
   };
 }
 
-function closeM0(body) {
-  if (body && typeof body.angle_deg === 'number') return (body.angle_deg * Math.PI) / 180;
-  const orbit = (body && body.orbit) || {};
-  if (typeof orbit.mean_anomaly_deg === 'number') return (orbit.mean_anomaly_deg * Math.PI) / 180;
+function closeM0(angles, body) {
+  if (body && angles && angles.has(body.id)) return angles.get(body.id);
   return 0;
 }
 
-function closeSpot(system, body, a, tDays, period) {
+function closeSpot(system, body, a, tDays, period, angles) {
   if (usesAngle(body)) return spotAt(system, body, a, tDays, 0, period);
   const orbit = body.orbit || {};
-  return pos({ a: a, e: orbit.e || 0, period_days: period, M0: closeM0(body), w: 0 }, tDays);
+  return pos({ a: a, e: orbit.e || 0, period_days: period, M0: closeM0(angles, body), w: 0 }, tDays);
 }
 
 function buildClose(system, view, options, focus) {
@@ -638,6 +620,7 @@ function buildClose(system, view, options, focus) {
   const extentKm = closeExtentKm(system, focus);
   const scale = CLOSE_SPAN / extentKm;
   const tDays = typeof view.epoch_days === 'number' ? view.epoch_days : 0;
+  const angles = displayAngleMap(system);
   const focusKm = focusRadiusKm(focus);
   const focusRadius = focusKm > 0 ? focusKm * scale : visualRadius(focus);
   const bodies = [markSubmap(system, focus, bodyRecord(focus, { x: 0, y: 0, z: 0 }, focusRadius))];
@@ -645,7 +628,7 @@ function buildClose(system, view, options, focus) {
     const orbit = body.orbit || {};
     const a = orbit.a_km;
     const period = orbit.period_days > 0 ? orbit.period_days : 1;
-    const spot = closeSpot(system, body, a, tDays, period);
+    const spot = closeSpot(system, body, a, tDays, period, angles);
     bodies.push(markSubmap(system, body, bodyRecord(body, toThree(spot.x * scale, spot.y * scale), visualRadius(body))));
   });
   const orbits = [];
@@ -662,7 +645,7 @@ function buildClose(system, view, options, focus) {
       const period = orbit.period_days > 0 ? orbit.period_days : 1;
       const points = usesAngle(body)
         ? sampleAngled(system, body, a, period, 96, function (x, y) { return toThree(x * scale, y * scale); })
-        : sampleEllipse(a, orbit.e || 0, period, closeM0(body), 96, function (x, y) {
+        : sampleEllipse(a, orbit.e || 0, period, closeM0(angles, body), 96, function (x, y) {
           return toThree(x * scale, y * scale);
         });
       orbits.push({
@@ -964,7 +947,7 @@ export function infoLines(system, id) {
   if (typeof physical.radius_km === 'number') lines.push(String(physical.radius_km) + ' km radius');
   if (typeof physical.mass_earth === 'number') lines.push(String(physical.mass_earth) + ' Earth masses');
   if (typeof physical.surface_g === 'number') lines.push(String(physical.surface_g) + ' g');
-  if (angleIsMissing(body)) lines.push('Start angle is not set');
+  if (angleIsMissing(body)) lines.push(ANGLE_MISSING_LINE);
   return lines;
 }
 

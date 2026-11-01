@@ -404,6 +404,12 @@ test('controls give the stage 78vh, schematic button is gone, and GLB paths live
   const system = readJson('site/data/tau-ceti.system.json');
   Object.keys(models.BODY_MODEL_FILE).forEach(function (id) {
     const expected = 'models/' + models.BODY_MODEL_FILE[id];
+    if (id === 'tc6gate') {
+      const body = system.bodies.find(function (item) { return item.id === id; });
+      assert.equal(Object.prototype.hasOwnProperty.call(body, 'model'), false, id);
+      assert.equal(models.modelFileForBody(id, system), expected);
+      return;
+    }
     if (id === 'star') assert.equal(system.star.model, expected);
     else {
       const body = system.bodies.find(function (item) { return item.id === id; });
@@ -411,7 +417,7 @@ test('controls give the stage 78vh, schematic button is gone, and GLB paths live
     }
     assert.equal(models.modelFileForBody(id, system), expected);
   });
-  ['haven', 'yard', 'watch', 'tc6gate', 'b1', 'b2'].forEach(function (id) {
+  ['haven', 'yard', 'watch', 'b1', 'b2'].forEach(function (id) {
     const body = system.bodies.find(function (item) { return item.id === id; });
     assert.equal(Object.prototype.hasOwnProperty.call(body, 'model'), false, id);
     assert.equal(models.modelFileForBody(id, system), null);

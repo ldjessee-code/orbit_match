@@ -17,10 +17,12 @@ const EXPECTED_FILES = {
   tc5b: 'der-eindringling.glb',
   tc6: 'croquet-ball.glb',
   tc7: 'cue-ball.glb',
-  tc8: 'eight-ball.glb'
+  tc8: 'eight-ball.glb',
+  tc6gate: 'jumpgate-ring-v4.glb'
 };
 
-const SPHERE_ONLY = ['haven', 'yard', 'watch', 'tc6gate', 'b1', 'b2'];
+const SPHERE_ONLY = ['haven', 'yard', 'watch', 'b1', 'b2'];
+const RING_GLB = 'jumpgate-ring-v4.glb';
 
 const KAKAKIKO_NODES = [
   'SM_kakakiko_clouds',
@@ -59,6 +61,7 @@ test('shipped body glbs are unit-radius and name the Kakakiko layers', function 
   const onDisk = fs.readdirSync(modelDir).filter(function (name) { return name.endsWith('.glb'); }).sort();
   assert.deepEqual(onDisk, listed);
   onDisk.forEach(function (fileName) {
+    if (fileName === RING_GLB) return;
     const doc = glbDocument(fileName);
     const carriers = nodeExtras(doc.json);
     assert.ok(carriers.length >= 1, fileName + ' extras');
@@ -110,6 +113,18 @@ test('model scale matches the display radius and a failed load keeps the sphere'
   assert.equal(models.modelScale(NaN), null);
   scene.bodies.forEach(function (body) {
     if (!models.modelFileForBody(body.id)) return;
+    if (body.id === 'tc6gate') {
+      const display = models.JUMPGATE_RING_DISPLAY_OUTER_RADIUS;
+      const scale = models.ringModelScale(display);
+      assert.equal(models.modelScale(display, body.id), scale, body.id);
+      const plan = models.modelMountPlan({ ok: true }, body.id, display);
+      assert.equal(plan.fallback, false, body.id);
+      assert.equal(plan.hideSphere, true, body.id);
+      assert.equal(plan.scale, scale, body.id);
+      assert.equal(plan.pickId, body.id, body.id);
+      assert.equal(plan.file, 'models/jumpgate-ring-v4.glb', body.id);
+      return;
+    }
     assert.equal(models.modelScale(body.radius), body.radius, body.id);
     const plan = models.modelMountPlan({ ok: true }, body.id, body.radius);
     assert.equal(plan.fallback, false, body.id);
@@ -130,9 +145,11 @@ test('model scale matches the display radius and a failed load keeps the sphere'
   assert.equal(missing.fallback, true);
   assert.equal(missing.hideSphere, false);
   assert.equal(missing.pickId, 'tc1');
-  const structure = models.modelMountPlan({ ok: true }, 'tc6gate', 0.2);
-  assert.equal(structure.fallback, true);
-  assert.equal(structure.file, null);
+  const structure = models.modelMountPlan({ ok: true }, 'tc6gate', models.JUMPGATE_RING_DISPLAY_OUTER_RADIUS);
+  assert.equal(structure.fallback, false);
+  assert.equal(structure.file, 'models/jumpgate-ring-v4.glb');
+  assert.equal(structure.hideSphere, true);
+  assert.equal(structure.scale, models.ringModelScale(models.JUMPGATE_RING_DISPLAY_OUTER_RADIUS));
   const focus = close.bodies.find(function (body) { return body.id === 'tc5'; });
   const moon = close.bodies.find(function (body) { return body.id === 'tc5a'; });
   assert.equal(models.modelMountPlan({ ok: true }, 'tc5', focus.radius).scale, focus.radius);

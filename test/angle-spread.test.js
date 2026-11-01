@@ -117,6 +117,17 @@ function assertDrawnAtStart(kepler, record, body, m0) {
   assert.ok(radDiff(drawnAngle(record), expected) < 1e-6, body.id + ' drew ' + drawnAngle(record) + ' expected ' + expected);
 }
 
+// A stored position_angle_deg is true longitude at T+0. Mean-anomaly placement
+// (pos with w = 0) matches that only when e is 0.
+function assertViewerStart(kepler, record, body, m0) {
+  const orbit = body && body.orbit ? body.orbit : {};
+  if (typeof orbit.position_angle_deg === 'number') {
+    assert.ok(radDiff(drawnAngle(record), deg(orbit.position_angle_deg)) < 1e-6, body.id + ' drew ' + drawnAngle(record));
+    return;
+  }
+  assertDrawnAtStart(kepler, record, body, m0);
+}
+
 test('displayAngleMap spreads missing angles and keeps stored angles exact', async function () {
   const mod = await import('../site/js/display-angles.js');
   const shared = read('site/js/display-angles.js');
@@ -177,7 +188,7 @@ test('displayAngleMap spreads missing angles and keeps stored angles exact', asy
   assert.deepEqual(map, expectedDisplayMap(mixed));
 });
 
-test('Tau Ceti at T+0 spreads planets and keeps the tc5 station angles', async function () {
+test('Tau Ceti at T+0 draws the locked start angles and keeps the tc5 station angles', async function () {
   const bag = await loadStack();
   const fileBefore = read('site/data/tau-ceti.system.json');
   const system = bag.schema.loadSystem(readJson('site/data/tau-ceti.system.json'));
@@ -188,28 +199,25 @@ test('Tau Ceti at T+0 spreads planets and keeps the tc5 station angles', async f
   const expectMap = expectedDisplayMap(system);
   const scene = bag.model.buildScene(system, view);
   const svg = bag.draw.renderSvg(system, view, bag.empire, bag.quiet);
-  const planets = ['tc1', 'tc2', 'tc3', 'tc4', 'tc5', 'tc6', 'tc7', 'tc8'];
-  const planetAngles = planets.map(function (id) {
+  const locked = {
+    tc1: 202.29,
+    tc2: 300.41,
+    tc3: 12.68,
+    tc4: 184.69,
+    tc5: 8.13,
+    tc6: 3.94,
+    tc7: 8.04,
+    tc8: 253.57
+  };
+  Object.keys(locked).forEach(function (id) {
     const record = scene.bodies.find(function (body) { return body.id === id; });
     assert.ok(record, id);
-    assert.equal(record.angle_missing, true);
-    return drawnAngle(record);
+    assert.equal(record.angle_missing, false, id);
+    assert.ok(radDiff(drawnAngle(record), deg(locked[id])) < 1e-6, id + ' ' + drawnAngle(record));
   });
-  for (let i = 0; i < planetAngles.length; i++) {
-    for (let j = i + 1; j < planetAngles.length; j++) {
-      assert.ok(radDiff(planetAngles[i], planetAngles[j]) > 1e-3, planets[i] + ' vs ' + planets[j]);
-    }
-  }
-  const lineDirs = planetAngles.map(function (angle) {
-    let dir = angle % Math.PI;
-    if (dir < 0) dir += Math.PI;
-    return dir;
-  });
-  const span = Math.max.apply(null, lineDirs) - Math.min.apply(null, lineDirs);
-  assert.ok(span > 0.4, String(span));
   scene.bodies.forEach(function (record) {
     const body = system.bodies.find(function (item) { return item.id === record.id; });
-    assertDrawnAtStart(bag.kepler, record, body, expectMap.get(record.id));
+    assertViewerStart(bag.kepler, record, body, expectMap.get(record.id));
     const fromSvg = svgAngle(svg, record.id, 800, 530, view.elevation_deg);
     assert.ok(radDiff(fromSvg, drawnAngle(record)) < 0.02, record.id + ' svg ' + fromSvg);
   });
@@ -228,25 +236,27 @@ test('Tau Ceti at T+0 spreads planets and keeps the tc5 station angles', async f
     const fromSvg = svgAngle(closeSvg, id, 820, 530, view.elevation_deg);
     assert.ok(radDiff(fromSvg, drawnAngle(record)) < 0.02, id);
   });
-  ['tc5a', 'tc5b'].forEach(function (id) {
+  const moons = { tc5a: 319.24, tc5b: 64.99 };
+  Object.keys(moons).forEach(function (id) {
     const record = close.bodies.find(function (body) { return body.id === id; });
     const body = system.bodies.find(function (item) { return item.id === id; });
-    assert.equal(record.angle_missing, true);
-    assertDrawnAtStart(bag.kepler, record, body, expectMap.get(id));
-    assert.ok(radDiff(drawnAngle(record), 0) > 0.2, id);
+    assert.equal(record.angle_missing, false, id);
+    assert.ok(radDiff(drawnAngle(record), deg(moons[id])) < 1e-6, id + ' ' + drawnAngle(record));
+    assertViewerStart(bag.kepler, record, body, expectMap.get(id));
     const fromSvg = svgAngle(closeSvg, id, 820, 530, view.elevation_deg);
     assert.ok(radDiff(fromSvg, drawnAngle(record)) < 0.02, id);
   });
   assert.equal(JSON.stringify(system), loadedBefore);
   assert.equal(read('site/data/tau-ceti.system.json'), fileBefore);
   const tc1 = system.bodies.find(function (body) { return body.id === 'tc1'; });
-  assert.equal(tc1.orbit.position_angle_deg, undefined);
+  assert.equal(tc1.orbit.e, null);
+  assert.equal(tc1.orbit.position_angle_deg, 202.29);
   assert.equal(Object.prototype.hasOwnProperty.call(tc1, 'angle_deg'), false);
   assert.equal(tc1.orbit.mean_anomaly_deg, undefined);
   const lines = bag.model.infoLines(system, 'tc1').join('\n');
-  assert.match(lines, /Start angle is not set/);
-  assert.match(lines, /spread for reading/);
-  assert.match(lines, /not a canon angle/);
+  assert.doesNotMatch(lines, /Start angle is not set/);
+  assert.match(bag.model.infoLines(system, 'tc6gate').join('\n'), /Start angle is not set/);
+  assert.match(bag.model.infoLines(system, 'tc6gate').join('\n'), /spread for reading/);
   assert.equal(bag.model.infoLines(system, 'yard').join('\n').indexOf('Start angle is not set'), -1);
 });
 
@@ -383,12 +393,12 @@ test('the playback clock returns every body to its T+0 angle', async function ()
     const start = atStart.bodies.find(function (body) { return body.id === record.id; });
     const body = system.bodies.find(function (item) { return item.id === record.id; });
     assert.ok(radDiff(drawnAngle(record), drawnAngle(start)) < 1e-9, record.id);
-    assertDrawnAtStart(bag.kepler, record, body, expectMap.get(record.id));
+    assertViewerStart(bag.kepler, record, body, expectMap.get(record.id));
   });
   backClose.bodies.forEach(function (record) {
     if (record.id === 'tc5') return;
     const body = system.bodies.find(function (item) { return item.id === record.id; });
-    assertDrawnAtStart(bag.kepler, record, body, expectMap.get(record.id));
+    assertViewerStart(bag.kepler, record, body, expectMap.get(record.id));
   });
   const svgBack = bag.draw.renderSvg(system, backView, bag.empire, bag.quiet);
   const svgStart = bag.draw.renderSvg(system, view, bag.empire, bag.quiet);

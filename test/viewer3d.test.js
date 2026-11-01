@@ -892,14 +892,21 @@ test('Kakakiko close-up uses one kilometre scale', async function () {
   const derR = Math.hypot(der.position.x, der.position.z);
   const kepler = await import('../site/js/kepler.js');
   const closeScale = 8 / extent;
-  function orbitRadius(a, e, period, m0) {
-    const spot = kepler.pos({ a: a, e: e, period_days: period, M0: m0, w: 0 }, 0);
-    return Math.hypot(spot.x, spot.y);
+  // Locked start angles replace the old index spread (3/5 and 4/5 of the circle).
+  // The scene radius is still the Kepler radius in kilometres times the close scale.
+  function angledRadius(a, e, position, peri) {
+    const spot = kepler.positionFromAngles({
+      a: a,
+      e: e,
+      period_days: 1,
+      position_angle_deg: position,
+      perihelion_longitude_deg: peri,
+      reference_deg: 0
+    }, 0);
+    return spot.radius;
   }
-  const shudderM0 = (3 / 5) * Math.PI * 2;
-  const derM0 = (4 / 5) * Math.PI * 2;
-  assert.ok(Math.abs(shudderR - orbitRadius(151060, 0.2, 6.607, shudderM0) * closeScale) < 1e-6, String(shudderR));
-  assert.ok(Math.abs(derR - orbitRadius(240000, 0.03, 13.213, derM0) * closeScale) < 1e-6, String(derR));
+  assert.ok(Math.abs(shudderR - angledRadius(151060, 0.2, 319.24, 196.87) * closeScale) < 1e-6, String(shudderR));
+  assert.ok(Math.abs(derR - angledRadius(240000, 0.03, 64.99, 196.87) * closeScale) < 1e-6, String(derR));
 });
 
 test('elapsed_days moves the system view and the submap', async function () {

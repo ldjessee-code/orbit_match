@@ -93,7 +93,14 @@
       "bodies.b2.name",
       "bodies.b2.orbit.a_inner_au",
       "bodies.b2.orbit.a_outer_au"
-    ]
+    ],
+    "angles": {
+      "source": "F:\\Dropbox\\Projects\\Turquenish\\review\\tau_ceti_angles_for_viewer_20261031.md",
+      "version": "v2.41o",
+      "locked": "2026-10-31",
+      "epoch": "3629-01-01 00:00:01",
+      "prepared_by": "LadyT"
+    }
   },
   "rings_belts": {
     "provenance": {
@@ -133,10 +140,15 @@
       { "key": "canon.est_spelling", "value": "est.", "tag": "est.", "note": "source uses est. with a period; existing body.canon uses est" }
     ]
   },
+  "reference_direction": {
+    "label": "fixed system axis (arbitrary direction); angles increase prograde",
+    "deg": 0
+  },
   "epoch": {
     "t0_days": 0,
-    "label": "T+0 (circa 1600 yrs hence)",
-    "canon": "placeholder"
+    "label": "T+0 (epoch)",
+    "game_datetime": "3629-01-01 00:00:01",
+    "canon": "locked"
   },
   "star": {
     "hostname": "tau Cet",
@@ -172,9 +184,9 @@
       "designation": "tC 1",
       "kind": "planet",
       "parent": null,
-      "orbit": { "a_au": 0.133, "e": null, "period_days": 20.1 },
+      "orbit": { "a_au": 0.133, "e": null, "period_days": 20.1, "position_angle_deg": 202.29, "perihelion_longitude_deg": 182.31 },
       "physical": { "mass_earth": 0.06, "radius_km": 2820 },
-      "canon": { "orbit.a_au": "real", "orbit.e": "tbd", "physical.mass_earth": "est" },
+      "canon": { "orbit.a_au": "real", "orbit.e": "tbd", "physical.mass_earth": "est", "orbit.position_angle_deg": "locked", "orbit.perihelion_longitude_deg": "locked" },
       "source": "Tau_Cet_system_v2.md §6.1"
     },
     {
@@ -185,9 +197,9 @@
       "designation": "tC 2",
       "kind": "planet",
       "parent": null,
-      "orbit": { "a_au": 0.243, "period_days": 49.5 },
+      "orbit": { "a_au": 0.243, "period_days": 49.5, "position_angle_deg": 300.41, "perihelion_longitude_deg": 211.47 },
       "physical": { "mass_earth": 0.08, "radius_km": 3110 },
-      "canon": { "orbit.a_au": "real", "physical.mass_earth": "est" },
+      "canon": { "orbit.a_au": "real", "physical.mass_earth": "est", "orbit.position_angle_deg": "locked", "orbit.perihelion_longitude_deg": "locked" },
       "source": "Tau_Cet_system_v2.md §6.2"
     },
     {
@@ -198,9 +210,9 @@
       "designation": "tC 3",
       "kind": "planet",
       "parent": null,
-      "orbit": { "a_au": 0.34, "period_days": 82 },
+      "orbit": { "a_au": 0.34, "period_days": 82, "position_angle_deg": 12.68, "perihelion_longitude_deg": 100.66 },
       "physical": { "mass_earth": 0.1, "radius_km": 3350 },
-      "canon": { "orbit.a_au": "fiction", "physical.mass_earth": "est" },
+      "canon": { "orbit.a_au": "fiction", "physical.mass_earth": "est", "orbit.position_angle_deg": "locked", "orbit.perihelion_longitude_deg": "locked" },
       "source": "Tau_Cet_system_v2.md §6.3"
     },
     {
@@ -211,9 +223,9 @@
       "designation": "tC 4",
       "kind": "planet",
       "parent": null,
-      "orbit": { "a_au": 0.538, "e": 0, "e_max": 0.1, "period_days": 163.2 },
+      "orbit": { "a_au": 0.538, "e": 0, "e_max": 0.1, "period_days": 163.2, "position_angle_deg": 184.69, "perihelion_longitude_deg": 65.57 },
       "physical": { "mass_earth": 2, "radius_km": 7900 },
-      "canon": { "orbit.a_au": "real", "orbit.e": "derived", "orbit.e_max": "locked", "physical.mass_earth": "locked" },
+      "canon": { "orbit.a_au": "real", "orbit.e": "derived", "orbit.e_max": "locked", "physical.mass_earth": "locked", "orbit.position_angle_deg": "locked", "orbit.perihelion_longitude_deg": "locked" },
       "source": "Tau_Cet_system_v2.md §6.4"
     },
     {
@@ -230,9 +242,9 @@
       "designation": "tC 5",
       "kind": "planet",
       "parent": null,
-      "orbit": { "a_au": 0.71, "e": 0.0396, "period_days": 247.4 },
+      "orbit": { "a_au": 0.71, "e": 0.0396, "period_days": 247.4, "position_angle_deg": 8.13, "perihelion_longitude_deg": 327.55 },
       "physical": { "mass_earth": 1.045, "radius_km": 6628, "surface_g": 0.967, "rotation_h": 34, "tilt_deg": 12 },
-      "canon": { "orbit.a_au": "locked", "orbit.e": "locked", "physical.surface_g": "locked", "physical.rotation_h": "locked", "physical.tilt_deg": "locked" },
+      "canon": { "orbit.a_au": "locked", "orbit.e": "locked", "physical.surface_g": "locked", "physical.rotation_h": "locked", "physical.tilt_deg": "locked", "orbit.position_angle_deg": "locked", "orbit.perihelion_longitude_deg": "locked" },
       "source": "Tau_Cet_system_v2.md §6.5"
     },
     {
@@ -243,9 +255,9 @@
       "designation": "tC 5a",
       "kind": "moon",
       "parent": "tc5",
-      "orbit": { "a_km": 151060, "e": 0.2, "period_days": 6.607 },
+      "orbit": { "a_km": 151060, "e": 0.2, "period_days": 6.607, "position_angle_deg": 319.24, "perihelion_longitude_deg": 196.87 },
       "physical": { "mass_kg": 1.491e22, "radius_km": 1083.5 },
-      "canon": { "name": "locked", "orbit.a_km": "est", "orbit.e": "est" },
+      "canon": { "name": "locked", "orbit.a_km": "est", "orbit.e": "est", "orbit.position_angle_deg": "est", "orbit.perihelion_longitude_deg": "est" },
       "source": "Tau_Cet_system_v2.md §6.5"
     },
     {
@@ -256,9 +268,9 @@
       "designation": "tC 5b",
       "kind": "moon",
       "parent": "tc5",
-      "orbit": { "a_km": 240000, "e": 0.03, "period_days": 13.213 },
+      "orbit": { "a_km": 240000, "e": 0.03, "period_days": 13.213, "position_angle_deg": 64.99, "perihelion_longitude_deg": 196.87 },
       "physical": { "mass_kg": 3.122e22, "radius_km": 1012 },
-      "canon": { "orbit.a_km": "est", "orbit.e": "est", "physical.mass_kg": "est" },
+      "canon": { "orbit.a_km": "est", "orbit.e": "est", "physical.mass_kg": "est", "orbit.position_angle_deg": "est", "orbit.perihelion_longitude_deg": "est" },
       "source": "Tau_Cet_system_v2.md §6.5"
     },
     {
@@ -340,9 +352,9 @@
       "designation": "tC 6",
       "kind": "planet",
       "parent": null,
-      "orbit": { "a_au": 2.8, "period_days": 1939.4775 },
+      "orbit": { "a_au": 2.8, "period_days": 1939.4775, "position_angle_deg": 3.94, "perihelion_longitude_deg": 64.96 },
       "physical": { "mass_earth": 95, "radius_km": 58200 },
-      "canon": { "name": "locked", "orbit.a_au": "est", "physical.mass_earth": "est" },
+      "canon": { "name": "locked", "orbit.a_au": "est", "physical.mass_earth": "est", "orbit.position_angle_deg": "locked", "orbit.perihelion_longitude_deg": "locked" },
       "source": "Tau_Cet_system_v2.md §6.6",
       "ring_system": {
         "tag": "fiction",
@@ -385,9 +397,9 @@
       "designation": "tC 7",
       "kind": "planet",
       "parent": null,
-      "orbit": { "a_au": 5.5, "period_days": 5332.65 },
+      "orbit": { "a_au": 5.5, "period_days": 5332.65, "position_angle_deg": 8.04, "perihelion_longitude_deg": 207.18 },
       "physical": { "mass_earth": 17, "radius_km": 24600 },
-      "canon": { "name": "locked", "orbit.a_au": "est", "physical.mass_earth": "est" },
+      "canon": { "name": "locked", "orbit.a_au": "est", "physical.mass_earth": "est", "orbit.position_angle_deg": "locked", "orbit.perihelion_longitude_deg": "locked" },
       "source": "Tau_Cet_system_v2.md §6.7",
       "ring_system": {
         "tag": "fiction",
@@ -426,9 +438,9 @@
       "designation": "tC 8",
       "kind": "planet",
       "parent": null,
-      "orbit": { "a_au": 9.2, "period_days": 11541.9 },
+      "orbit": { "a_au": 9.2, "period_days": 11541.9, "position_angle_deg": 253.57, "perihelion_longitude_deg": 78.44 },
       "physical": { "mass_earth": 13, "radius_km": 24500 },
-      "canon": { "name": "locked", "physical.mass_earth": "locked", "physical.radius_km": "est" },
+      "canon": { "name": "locked", "physical.mass_earth": "locked", "physical.radius_km": "est", "orbit.position_angle_deg": "locked", "orbit.perihelion_longitude_deg": "locked" },
       "source": "Tau_Cet_system_v2.md §6.8",
       "ring_system": {
         "tag": "fiction",

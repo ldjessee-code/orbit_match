@@ -294,7 +294,7 @@ test('a failed ring load is a fallback plan and a rejecting loader leaves the sp
   });
 });
 
-test('gate position and angle at T+0 and T+100 stay on the start-commit values, 60 deg ahead of tc6', async function () {
+test('gate stays 60 deg ahead of tc6, and at T+0 tc6 is at the locked 3.94 deg', async function () {
   const schema = await import('../site/js/schema.js');
   const sceneModel = await import('../site/viewer3d/scene-model.js');
   const system = schema.loadSystem(readJson('site/data/tau-ceti.system.json'));
@@ -322,30 +322,23 @@ test('gate position and angle at T+0 and T+100 stay on the start-commit values, 
     }
   };
   fs.writeFileSync(path.join(jobDir, '_gate_poses.json'), JSON.stringify(pose, null, 2));
+  function degOf(rad) {
+    let value = (rad * 180) / Math.PI;
+    value = ((value % 360) + 360) % 360;
+    return value;
+  }
+  function degGap(a, b) {
+    const d = Math.abs(a - b) % 360;
+    return Math.min(d, 360 - d);
+  }
+  assert.ok(degGap(degOf(pose.t0.tc6Angle), 3.94) < 1e-4, String(degOf(pose.t0.tc6Angle)));
+  assert.ok(degGap(degOf(pose.t0.gateAngle), 63.94) < 1e-4, String(degOf(pose.t0.gateAngle)));
   assert.ok(Math.abs(wrappedDelta(pose.t0.tc6Angle, pose.t0.gateAngle) - Math.PI / 3) < 1e-9);
   assert.ok(Math.abs(wrappedDelta(pose.t100.tc6Angle, pose.t100.gateAngle) - Math.PI / 3) < 5e-4);
-  assert.deepEqual(gate0.position, {
-    x: -1.5639745225570287,
-    y: 0,
-    z: 8.869740276122965
-  });
-  assert.deepEqual(tc60.position, {
-    x: -8.463407665371005,
-    y: 0,
-    z: 3.0804284706554523
-  });
-  assert.deepEqual(gateN.position, {
-    x: 1.3435378325824996,
-    y: 0,
-    z: 8.905796705826205
-  });
-  assert.deepEqual(tc6N.position, {
-    x: -7.042573584640971,
-    y: 0,
-    z: 5.614309056153088
-  });
   assert.equal(gate0.radius, 0.23578582832551992);
   assert.equal(tc60.radius, 0.40226247616196276);
+  assert.ok(Math.hypot(gateN.position.x - gate0.position.x, gateN.position.z - gate0.position.z) > 0.01);
+  assert.ok(Math.hypot(tc6N.position.x - tc60.position.x, tc6N.position.z - tc60.position.z) > 0.01);
 });
 
 test('jumpgate label and card say not to scale in the normal view', async function () {

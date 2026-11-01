@@ -263,14 +263,16 @@ test('epoch.game_datetime round-trips and a missing one stays empty', async func
   const model = await import('../site/viewer3d/scene-model.js');
   const tau = schema.loadSystem(readJson(fixturePath));
   assert.equal(tau.epoch.t0_days, 0);
-  assert.equal(tau.epoch.canon, 'placeholder');
-  assert.equal(tau.epoch.game_datetime, undefined);
+  assert.equal(tau.epoch.label, 'T+0 (epoch)');
+  assert.equal(tau.epoch.canon, 'locked');
+  assert.equal(tau.epoch.game_datetime, '3629-01-01 00:00:01');
   const tauView = schema.loadView(readJson(viewPath));
   assert.equal(tauView.epoch_days, 0);
   assert.doesNotMatch(JSON.stringify(tau), /elapsed_days/);
   assert.doesNotMatch(JSON.stringify(tauView), /elapsed_days/);
   const tauScene = model.buildScene(tau, tauView);
-  assert.match(tauScene.epochLabel, /placeholder/);
+  assert.equal(tauScene.epochLabel, 'T+0 (epoch) · 3629-01-01 00:00:01');
+  assert.doesNotMatch(tauScene.epochLabel, /placeholder/);
   assert.doesNotMatch(tauScene.epochLabel, /March|ISO|game_datetime/);
   const loaded = schema.loadSystem({
     orbit_match: 2,

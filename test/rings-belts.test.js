@@ -306,7 +306,7 @@ test('Cue Ball has exactly one ring source: the data-driven ring-belt', async fu
   const client = read('site/viewer3d/viewer3d.js');
   assert.match(client, /solidRingForBody/);
   assert.match(client, /planetRingsFromScene/);
-  assert.match(client, /isGlbRingNode/);
+  assert.match(client, /shouldHideGlbRingNode/);
   const rebuild = client.match(/function rebuild\([\s\S]*?\n\}/);
   assert.ok(rebuild, 'rebuild');
   assert.match(rebuild[0], /solidRingForBody/);

@@ -68,10 +68,15 @@ import {
 import {
   modelFileForBody,
   modelMountPlan,
+  modelDisplayRadius,
   defaultLayerState,
   setLayerVisible,
   layerVisibleForNode,
-  isGlbRingNode
+  shouldHideGlbRingNode,
+  applyBodyModelLoadResult,
+  jumpgateRingBodyLabel,
+  jumpgateRingScaleNote,
+  isJumpgateRingBody
 } from './body-models.js';
 
 let loadedSystem = null;
@@ -273,7 +278,8 @@ function syncLabels(data) {
   data.bodies.forEach(function (body) {
     const el = document.createElement('span');
     el.className = 'body-label';
-    el.textContent = body.submap ? body.name + ' ·' : body.name;
+    const base = body.submap ? body.name + ' ·' : body.name;
+    el.textContent = isJumpgateRingBody(body.id) ? jumpgateRingBodyLabel(base, false) : base;
     host.appendChild(el);
     labelEntries.push({ el: el, position: body.position });
   });
@@ -369,7 +375,12 @@ function paintCards() {
     const card = document.createElement('article');
     card.className = 'card';
     card.dataset.corner = slot.corner;
-    calloutLines(loadedSystem, key, sceneTransfers).forEach(function (line) {
+    const lines = calloutLines(loadedSystem, key, sceneTransfers).slice();
+    if (isJumpgateRingBody(id)) {
+      const noteLine = jumpgateRingScaleNote(false);
+      if (noteLine) lines.push(noteLine);
+    }
+    lines.forEach(function (line) {
       const row = document.createElement('p');
       row.textContent = line;
       card.appendChild(row);
@@ -753,7 +764,7 @@ function mountFromPlan(host, gltf, plan) {
   const model = gltf.scene;
   model.scale.setScalar(plan.scale);
   model.traverse(function (child) {
-    if (isGlbRingNode(child.name)) {
+    if (shouldHideGlbRingNode(child.name, plan.pickId)) {
       child.visible = false;
       return;
     }
@@ -776,9 +787,9 @@ function scheduleBodyModels(root, data) {
   if (!BodyGLTFLoader || !root || !data) return;
   const loader = new BodyGLTFLoader();
   const jobs = [];
-  if (data.star) jobs.push({ id: 'star', radius: data.star.radius });
+  if (data.star) jobs.push({ id: 'star', radius: modelDisplayRadius('star', data.star.radius) });
   (data.bodies || []).forEach(function (body) {
-    jobs.push({ id: body.id, radius: body.radius });
+    jobs.push({ id: body.id, radius: modelDisplayRadius(body.id, body.radius) });
   });
   jobs.forEach(function (job) {
     const file = modelFileForBody(job.id, loadedSystem);
@@ -789,18 +800,16 @@ function scheduleBodyModels(root, data) {
         return;
       }
       const host = findBodyHost(root, job.id);
-      const plan = modelMountPlan(host ? { ok: true } : { ok: false }, job.id, job.radius, file);
+      const plan = applyBodyModelLoadResult(host, !!(host && gltf && gltf.scene), job.id, job.radius, file);
       if (!host || plan.fallback) {
         if (gltf.scene) disposeObject(gltf.scene);
-        if (host) host.userData.modelFallback = true;
         return;
       }
       mountFromPlan(host, gltf, plan);
     }).catch(function () {
       if (generation !== modelGeneration) return;
       const host = findBodyHost(root, job.id);
-      const plan = modelMountPlan({ ok: false }, job.id, job.radius, file);
-      if (host && plan.fallback) host.userData.modelFallback = true;
+      applyBodyModelLoadResult(host, false, job.id, job.radius, file);
     });
   });
 }

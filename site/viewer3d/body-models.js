@@ -11,9 +11,54 @@ export const BODY_MODEL_FILE = {
   tc5a: 'shudder.glb',
   tc5b: 'der-eindringling.glb',
   tc6: 'croquet-ball.glb',
+  tc6gate: 'jumpgate-ring-v4.glb',
   tc7: 'cue-ball.glb',
   tc8: 'eight-ball.glb'
 };
+
+export const JUMPGATE_RING_BODY_ID = 'tc6gate';
+export const JUMPGATE_RING_TRUE_OUTER_RADIUS_M = 515.625;
+// Outer radius of the jumpgate ring in the system view, in scene units.
+// True outer radius is 515.625 m (1.03125 km across). At AU scale that is
+// invisible, so the ring is drawn at 0.36: larger than the old marker
+// (~0.236) and smaller than Croquet Ball / tc6 (~0.402). About 100000
+// times the true size next to tc6. The drawn size is never the true size
+// in the normal view.
+export const JUMPGATE_RING_DISPLAY_OUTER_RADIUS = 0.36;
+export const JUMPGATE_RING_ENLARGE_FACTOR = 100000;
+
+export function isJumpgateRingBody(id) {
+  return id === JUMPGATE_RING_BODY_ID;
+}
+
+export function ringModelScale(displayOuterRadius) {
+  const radius = Number(displayOuterRadius);
+  if (!Number.isFinite(radius) || radius <= 0) return null;
+  return radius / JUMPGATE_RING_TRUE_OUTER_RADIUS_M;
+}
+
+export function modelDisplayRadius(id, sceneRadius) {
+  if (isJumpgateRingBody(id)) return JUMPGATE_RING_DISPLAY_OUTER_RADIUS;
+  return sceneRadius;
+}
+
+export function shouldHideGlbRingNode(nodeName, bodyId) {
+  if (isJumpgateRingBody(bodyId)) return false;
+  return isGlbRingNode(nodeName);
+}
+
+export function jumpgateRingScaleNote(trueScale) {
+  if (trueScale) return '';
+  return 'Jumpgate ring: drawn about ' + JUMPGATE_RING_ENLARGE_FACTOR +
+    ' times its true size so it can be seen. Not to scale.';
+}
+
+export function jumpgateRingBodyLabel(name, trueScale) {
+  const base = name == null ? '' : String(name);
+  if (trueScale) return base;
+  if (!base) return 'not to scale';
+  return base + ' (not to scale)';
+}
 
 export function isGlbRingNode(name) {
   return /ring/i.test(String(name == null ? '' : name));
@@ -45,7 +90,8 @@ export function modelFileForBody(id, system) {
   return 'models/' + file;
 }
 
-export function modelScale(displayRadius) {
+export function modelScale(displayRadius, id) {
+  if (isJumpgateRingBody(id)) return ringModelScale(displayRadius);
   const radius = Number(displayRadius);
   if (!Number.isFinite(radius) || radius <= 0) return null;
   return radius;
@@ -54,11 +100,20 @@ export function modelScale(displayRadius) {
 export function modelMountPlan(result, id, displayRadius, fileOverride) {
   const pickId = id == null ? null : String(id);
   const file = fileOverride !== undefined ? fileOverride : modelFileForBody(pickId);
-  const scale = modelScale(displayRadius);
+  const scale = modelScale(displayRadius, pickId);
   if (!(result && result.ok && file && scale != null)) {
     return { pickId: pickId, fallback: true, hideSphere: false, scale: null, file: file };
   }
   return { pickId: pickId, fallback: false, hideSphere: true, scale: scale, file: file };
+}
+
+export function applyBodyModelLoadResult(host, loadOk, id, displayRadius, file) {
+  const plan = modelMountPlan(loadOk ? { ok: true } : { ok: false }, id, displayRadius, file);
+  if (host) {
+    if (!host.userData) host.userData = {};
+    host.userData.modelFallback = !!plan.fallback;
+  }
+  return plan;
 }
 
 // South winter ice matches the blend hide_render and the r3 preview (north cap only).

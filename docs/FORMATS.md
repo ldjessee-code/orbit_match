@@ -53,3 +53,7 @@ Both viewers play the shared `elapsed_days` clock forward or in reverse, or they
 ## This fixture
 
 Copied from Draft v2.41c on 2026-10-11. Shudder is 151,060 km at e = 0.20. Der Eindringling is 240,000 km at e = 0.03 and 1/200 of Kakakiko. Haven, the Yard, and the watch station sit on the 54,076 km synchronous ring. Moon L4 and L5 are not stations. The jumpgate is at Croquet Ball's L4 or L5, and which of those two is still open. Sable is drawn at e = 0, and `e_max` is 0.1.
+
+## 3D jumpgate ring
+
+The 3D viewer maps body id `tc6gate` in `site/viewer3d/body-models.js` (not in the Tau Ceti system file) to `site/viewer3d/models/jumpgate-ring-v4.glb`. Rudy built the file (Turquenish Faetheren jumpgate, v4, ring only, no gate disc). SHA-256 `E29165FF3C31A277AE9359EBE4FE8E42B390C49AE1F6C32DBC858A7C508D8857` (6,084,904 bytes). Units are metres. Outer radius 515.625 m, outer diameter 1031.25 m, depth about 328 m. Scene scale is (display outer radius) / 515.625. `JUMPGATE_RING_DISPLAY_OUTER_RADIUS` is 0.36 scene units: larger than the old marker (~0.236) and smaller than Croquet Ball / tc6 (~0.402), about 100000 times true size next to tc6. The drawn size is never the true size in the normal view. The body label and info card say the ring is not to scale. If the GLB fails to load (404, parse error, no GLTFLoader), the old sphere marker stays visible and pickable. The 2D SVG viewer is unchanged.

@@ -19,8 +19,15 @@
     var field = "";
     var quoted = false;
     var i;
+    // A byte-order mark is not part of the first column name.
+    text = String(text == null ? "" : text).replace(/^﻿/, "");
     for (i = 0; i < text.length; i++) {
       var c = text[i];
+      // NASA downloads start with "#" comment lines. Skip any such line.
+      if (!quoted && c === "#" && !row.length && field === "") {
+        while (i < text.length && text[i] !== "\n") i++;
+        continue;
+      }
       if (quoted) {
         if (c === '"') {
           if (text[i + 1] === '"') {

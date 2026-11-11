@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Build a system · Orbit Match</title>
 <link rel="stylesheet" href="../css/site.css">
 <link rel="stylesheet" href="manual.css">
@@ -57,6 +58,9 @@
         </label>
       </div>
       <div class="grid">
+        <label>Star name
+          <input data-header="hostname" autocomplete="off">
+        </label>
         <label>Setting name
           <input data-header="setting_name">
         </label>
@@ -71,6 +75,18 @@
         </label>
         <label>Temperature (K)
           <input data-header="teff" inputmode="decimal">
+        </label>
+        <label>Radius (sun)
+          <input data-header="rad" inputmode="decimal">
+        </label>
+        <label>X (light years)
+          <input data-header="x" inputmode="decimal">
+        </label>
+        <label>Y (light years)
+          <input data-header="y" inputmode="decimal">
+        </label>
+        <label>Z (light years)
+          <input data-header="z" inputmode="decimal">
         </label>
         <label>Known planets
           <input data-header="planets" inputmode="numeric">
@@ -114,6 +130,8 @@
         <button type="button" id="add-body">Add an orbital object</button>
         <button type="button" id="randomize-all">Randomize all planets</button>
         <button type="button" id="save-system">Save this system</button>
+        <button type="button" id="new-system">New system</button>
+        <button type="button" id="undo" disabled>Undo</button>
       </div>
     </section>
     <div class="stack" id="stack"></div>

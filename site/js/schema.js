@@ -44,6 +44,13 @@ function orbitFromV1(body) {
   return orbit;
 }
 
+// A version 1 body can already carry an orbit. Keep it, and let the flat
+// version 1 fields win where both are set, since those are what the form edits.
+function mergeOrbit(body) {
+  const kept = body.orbit && typeof body.orbit === 'object' && !Array.isArray(body.orbit) ? body.orbit : {};
+  return Object.assign({}, kept, orbitFromV1(body));
+}
+
 function stripV1Orbit(body) {
   delete body.au;
   delete body.period;
@@ -60,13 +67,13 @@ export function migrateV1toV2(input) {
     const planet = Object.assign({}, raw);
     stripV1Orbit(planet);
     planet.parent = planet.parent == null ? null : planet.parent;
-    planet.orbit = orbitFromV1(raw);
+    planet.orbit = mergeOrbit(raw);
     bodies.push(planet);
     for (const moon of moons) {
       const flat = Object.assign({}, moon);
       stripV1Orbit(flat);
       flat.parent = raw.id;
-      flat.orbit = orbitFromV1(moon);
+      flat.orbit = mergeOrbit(moon);
       bodies.push(flat);
     }
   }

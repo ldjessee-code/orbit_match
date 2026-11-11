@@ -1,4 +1,12 @@
 import { parseAngleDeg, randomAngleDeg } from './kepler.js';
+import { loadSystem, YEAR_DAYS } from './schema.js';
+
+// Throws with a reason when the viewers could not read this file. Works on a
+// copy, so the caller's data is untouched.
+export function checkSystem(data) {
+  loadSystem(JSON.parse(JSON.stringify(data)));
+  return true;
+}
 
 export const VIEWER_SYSTEM_ID = 'tau-ceti';
 export const STAR_OBJECT_ID = 'star';
@@ -82,33 +90,6 @@ function angleText(value) {
   return String(parsed.value);
 }
 
-function plainNum(value) {
-  if (value == null) return null;
-  const text = String(value).trim();
-  if (!text) return null;
-  const parsed = Number(text);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function exportManualBody(body) {
-  const next = Object.assign({}, body || {});
-  delete next.angle_error;
-  for (let i = 0; i < ANGLE_FIELDS.length; i++) {
-    const key = ANGLE_FIELDS[i];
-    if (next[key] == null || next[key] === '') {
-      delete next[key];
-      continue;
-    }
-    const parsed = parseAngleDeg(next[key]);
-    if (!parsed.ok || parsed.empty) throw new Error(key + ' is not a valid angle.');
-    next[key] = parsed.value;
-  }
-  if (Array.isArray(next.moons)) {
-    next.moons = next.moons.map(function (moon) { return exportManualBody(moon); });
-  }
-  return next;
-}
-
 const ANGLE_FIELDS = ['position_angle_deg', 'perihelion_longitude_deg'];
 const REFERENCE_LABEL = 'toward the vernal point / arbitrary';
 
@@ -139,78 +120,203 @@ export function randomizeManualAngles(bodies, randomAngleDeg) {
   });
 }
 
-function epochForSave(header) {
-  const obj = header.epoch_object;
-  if (obj && typeof obj === 'object' && !Array.isArray(obj) && String(header.epoch || '') === String(obj.label || '')) {
-    return obj;
-  }
-  if (header.epoch == null) return '';
-  return String(header.epoch);
+function copyJson(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function text(value) {
+  return value == null ? '' : String(value);
+}
+
+function listText(value) {
+  if (value == null) return '';
+  if (Array.isArray(value)) return value.join(', ');
+  return String(value);
+}
+
+// Star fields: header key, object in the file, key in that object.
+const STAR_TEXT = [['hostname', 'hostname'], ['setting_name', 'setting_name'], ['spectype', 'spectype']];
+const STAR_NUMBER = [['mass', 'mass_solar'], ['lum', 'lum_log'], ['teff', 'teff_k'], ['rad', 'radius_solar'], ['x', 'x_ly'], ['y', 'y_ly'], ['z', 'z_ly']];
+const CARD_TEXT = [['concept', 'high_concept'], ['holder', 'holder'], ['fuel', 'fuel'], ['fuel_unit', 'fuel_unit']];
+const HEADER_LABELS = {
+  mass: 'Star mass', lum: 'Star luminosity', teff: 'Star temperature', rad: 'Star radius',
+  x: 'Star x', y: 'Star y', z: 'Star z', planets: 'Known planets'
+};
+
+// Every builder header field, read from a system file. The file itself, less
+// its bodies, rides along as `source`, so a save can start from it and keep
+// the data the form has no field for.
 export function manualHeaderFromSystem(system) {
-  const src = system || {};
+  const src = isPlainObject(system) ? system : {};
+  const star = isPlainObject(src.star) ? src.star : {};
+  const card = isPlainObject(src.card) ? src.card : {};
   const epoch = src.epoch;
-  let text = '';
+  let epochText = '';
   let epochObject = null;
-  if (typeof epoch === 'string') text = epoch;
-  else if (epoch && typeof epoch === 'object' && !Array.isArray(epoch)) {
+  if (typeof epoch === 'string') epochText = epoch;
+  else if (isPlainObject(epoch)) {
     epochObject = epoch;
-    text = epoch.label == null ? '' : String(epoch.label);
+    epochText = epoch.label == null ? '' : String(epoch.label);
   }
   const ref = src.reference_direction;
   let label = REFERENCE_LABEL;
   let deg = '0';
   if (typeof ref === 'string' && ref.trim()) label = ref.trim();
-  else if (ref && typeof ref === 'object' && !Array.isArray(ref)) {
+  else if (isPlainObject(ref)) {
     if (ref.label != null && String(ref.label).trim() !== '') label = String(ref.label);
     if (ref.deg != null && ref.deg !== '') deg = String(ref.deg);
   }
-  return {
-    epoch: text,
+  const source = copyJson(src);
+  delete source.bodies;
+  const header = {
+    hostname: star.hostname || '',
+    setting_name: star.setting_name || '',
+    spectype: star.spectype || '',
+    planets: text(src.known_planet_count),
+    port: card.port || '',
+    services: listText(card.services),
+    arrivals: (Array.isArray(src.arrivals) ? src.arrivals : []).map(function (item) { return item && item.from_hostname; }).filter(Boolean),
+    epoch: epochText,
     epoch_object: epochObject,
     reference_label: label,
-    reference_deg: deg
+    reference_deg: deg,
+    source: source
   };
+  STAR_NUMBER.forEach(function (pair) { header[pair[0]] = text(star[pair[1]]); });
+  CARD_TEXT.forEach(function (pair) { header[pair[0]] = card[pair[1]] || ''; });
+  return header;
+}
+
+// A number typed in the form. Blank is null. Anything else that is not a
+// number stops the save, so a typo never erases a stored value.
+function formNumber(value, what) {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) throw new Error(what + ' is not a number: "' + raw + '".');
+  return parsed;
+}
+
+function setOrDelete(obj, key, value) {
+  if (value == null || value === '') delete obj[key];
+  else obj[key] = value;
+}
+
+function headerRecord(h) {
+  const source = isPlainObject(h.source) ? h.source : null;
+  const out = source ? copyJson(source) : { kind: 'system' };
+  const was = source ? manualHeaderFromSystem(source) : manualHeaderFromSystem({});
+  out.orbit_match = 2;
+  if (!out.kind) out.kind = 'system';
+  const changed = function (key) {
+    return JSON.stringify(h[key] == null ? '' : h[key]) !== JSON.stringify(was[key] == null ? '' : was[key]);
+  };
+  const star = function () {
+    if (!isPlainObject(out.star)) out.star = {};
+    return out.star;
+  };
+  const card = function () {
+    if (!isPlainObject(out.card)) out.card = {};
+    return out.card;
+  };
+  STAR_TEXT.forEach(function (pair) {
+    if (changed(pair[0])) setOrDelete(star(), pair[1], text(h[pair[0]]));
+  });
+  STAR_NUMBER.forEach(function (pair) {
+    if (changed(pair[0])) setOrDelete(star(), pair[1], formNumber(h[pair[0]], HEADER_LABELS[pair[0]]));
+  });
+  if (changed('planets')) setOrDelete(out, 'known_planet_count', formNumber(h.planets, HEADER_LABELS.planets));
+  CARD_TEXT.forEach(function (pair) {
+    if (changed(pair[0])) setOrDelete(card(), pair[1], text(h[pair[0]]));
+  });
+  if (changed('port')) card().port = h.port ? String(h.port) : null;
+  if (changed('services')) {
+    card().services = h.services ? String(h.services).split(',').map(function (part) { return part.trim(); }).filter(Boolean) : [];
+  }
+  if (changed('arrivals')) {
+    const before = Array.isArray(out.arrivals) ? out.arrivals : [];
+    out.arrivals = (h.arrivals || []).map(function (host) {
+      const kept = before.find(function (item) { return item && item.from_hostname === host; });
+      return kept || { from_hostname: host, route_id: '' };
+    });
+  }
+  if (changed('epoch')) {
+    // Rewording the epoch changes its label only. Its date stays.
+    if (isPlainObject(out.epoch)) out.epoch.label = text(h.epoch);
+    else setOrDelete(out, 'epoch', text(h.epoch));
+  }
+  if (changed('reference_label') || changed('reference_deg')) {
+    const refRaw = h.reference_deg == null || h.reference_deg === '' ? 0 : h.reference_deg;
+    const ref = parseAngleDeg(refRaw);
+    if (!ref.ok || ref.empty) throw new Error('reference_direction.deg is not a valid angle.');
+    const label = h.reference_label == null || String(h.reference_label).trim() === ''
+      ? REFERENCE_LABEL
+      : String(h.reference_label).trim();
+    out.reference_direction = Object.assign(isPlainObject(out.reference_direction) ? out.reference_direction : {}, { label: label, deg: ref.value });
+  }
+  return out;
+}
+
+// Keys the form adds to a body. They are written into `orbit`, or dropped.
+const FORM_ONLY = ['au', 'period', 'unit', 'distanceKm', 'position_angle_deg', 'perihelion_longitude_deg', 'moons', 'generated', 'angle_error'];
+// Free-text facts the form offers. A blank one is not written.
+const FORM_FACTS = ['gravity', 'atmosphere', 'water', 'temperature', 'day', 'population', 'government', 'tech', 'concept', 'pressure', 'o2', 'co2'];
+
+function periodDays(period, unit, what) {
+  const value = formNumber(period, what);
+  if (value == null) return null;
+  return unit === 'days' ? value : value * YEAR_DAYS;
+}
+
+// One body as version 2. Only the fields the form changed are written over
+// what the file had. Moons nested in the form come back as bodies after it.
+function exportBody(body, parentId, list) {
+  const name = (body && (body.name || body.id)) || 'A body';
+  const out = copyJson(body) || {};
+  FORM_ONLY.forEach(function (key) { delete out[key]; });
+  FORM_FACTS.forEach(function (key) {
+    if (out[key] === '' || out[key] == null) delete out[key];
+  });
+  if (parentId != null && (out.parent == null || out.parent === '')) out.parent = parentId;
+  const orbit = isPlainObject(out.orbit) ? out.orbit : {};
+  out.orbit = orbit;
+  // What the form would show for the stored orbit. A field that still shows
+  // that was not edited, so the stored value is kept exactly.
+  const was = manualBodyFromSystem({ orbit: isPlainObject(body.orbit) ? body.orbit : {} });
+  if (text(body.au).trim() !== text(was.au)) setOrDelete(orbit, 'a_au', formNumber(body.au, name + ': distance (AU)'));
+  if (text(body.distanceKm).trim() !== text(was.distanceKm)) setOrDelete(orbit, 'a_km', formNumber(body.distanceKm, name + ': distance (km)'));
+  const unit = body.unit || 'years';
+  const wasUnit = was.unit || 'years';
+  if (text(body.period).trim() !== text(was.period) || (text(body.period).trim() !== '' && unit !== wasUnit)) {
+    setOrDelete(orbit, 'period_days', periodDays(body.period, unit, name + ': period'));
+  }
+  ANGLE_FIELDS.forEach(function (key) {
+    if (text(body[key]).trim() === text(was[key])) return;
+    if (body[key] == null || String(body[key]).trim() === '') {
+      delete orbit[key];
+      return;
+    }
+    const parsed = parseAngleDeg(body[key]);
+    if (!parsed.ok || parsed.empty) throw new Error(name + ': ' + key + ' is not a valid angle.');
+    orbit[key] = parsed.value;
+  });
+  list.push(out);
+  (Array.isArray(body.moons) ? body.moons : []).forEach(function (moon) {
+    exportBody(moon, out.id, list);
+  });
 }
 
 export function systemRecordFromManual(header, bodies) {
-  const h = header || {};
-  const refRaw = h.reference_deg == null || h.reference_deg === '' ? 0 : h.reference_deg;
-  const ref = parseAngleDeg(refRaw);
-  if (!ref.ok || ref.empty) throw new Error('reference_direction.deg is not a valid angle.');
-  const label = h.reference_label == null || String(h.reference_label).trim() === ''
-    ? REFERENCE_LABEL
-    : String(h.reference_label).trim();
-  return {
-    orbit_match: 1,
-    kind: 'system',
-    epoch: epochForSave(h),
-    reference_direction: { label: label, deg: ref.value },
-    star: {
-      hostname: h.hostname,
-      setting_name: h.setting_name,
-      spectype: h.spectype,
-      mass_solar: plainNum(h.mass),
-      lum_log: plainNum(h.lum),
-      teff_k: plainNum(h.teff),
-      radius_solar: plainNum(h.rad),
-      x_ly: plainNum(h.x),
-      y_ly: plainNum(h.y),
-      z_ly: plainNum(h.z)
-    },
-    known_planet_count: plainNum(h.planets),
-    card: {
-      high_concept: h.concept,
-      port: h.port || null,
-      services: h.services ? String(h.services).split(',').map(function (part) { return part.trim(); }).filter(Boolean) : [],
-      holder: h.holder,
-      fuel: h.fuel,
-      fuel_unit: h.fuel_unit
-    },
-    arrivals: (h.arrivals || []).map(function (host) { return { from_hostname: host, route_id: '' }; }),
-    bodies: (bodies || []).map(function (body) { return exportManualBody(body); })
-  };
+  const out = headerRecord(header || {});
+  const list = [];
+  (bodies || []).forEach(function (body) { exportBody(body || {}, null, list); });
+  out.bodies = list;
+  return out;
 }
 
 export function manualBodyFromSystem(body) {
@@ -253,6 +359,7 @@ if (typeof window !== 'undefined') {
     manualBodyFromSystem: manualBodyFromSystem,
     manualHeaderFromSystem: manualHeaderFromSystem,
     systemRecordFromManual: systemRecordFromManual,
+    checkSystem: checkSystem,
     parseAngleDeg: parseAngleDeg,
     randomAngleDeg: randomAngleDeg,
     randomizeManualAngles: randomizeManualAngles

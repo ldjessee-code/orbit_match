@@ -347,8 +347,8 @@ test('builder link round-trips epoch, reference direction, and both planet angle
   assert.equal(saved.epoch, '2026-10-30');
   assert.equal(saved.reference_direction.deg, 0);
   assert.equal(saved.reference_direction.label, 'toward the vernal point / arbitrary');
-  assert.equal(saved.bodies[0].position_angle_deg, 12.34);
-  assert.equal(saved.bodies[0].perihelion_longitude_deg, 359.99);
+  assert.equal(saved.bodies[0].orbit.position_angle_deg, 12.34);
+  assert.equal(saved.bodies[0].orbit.perihelion_longitude_deg, 359.99);
   assert.equal(saved.star.mass_solar, 1);
   assert.equal(saved.card.high_concept, 'made up');
   const loaded = schema.loadSystem(saved);
@@ -361,8 +361,8 @@ test('builder link round-trips epoch, reference direction, and both planet angle
   assert.equal(backHeader.reference_deg, '0');
   assert.equal(backHeader.reference_label, 'toward the vernal point / arbitrary');
   const again = link.systemRecordFromManual(Object.assign({}, header, backHeader), [backBody]);
-  assert.equal(again.bodies[0].position_angle_deg, 12.34);
-  assert.equal(again.bodies[0].perihelion_longitude_deg, 359.99);
+  assert.equal(again.bodies[0].orbit.position_angle_deg, 12.34);
+  assert.equal(again.bodies[0].orbit.perihelion_longitude_deg, 359.99);
   assert.equal(again.reference_direction.deg, 0);
   assert.throws(function () {
     link.systemRecordFromManual(header, [{ id: 'x', position_angle_deg: 'east', perihelion_longitude_deg: '1' }]);
@@ -531,8 +531,9 @@ test('randomize all sets a moon angle and skips a belt', async function () {
       perihelion_longitude_deg: '15.5'
     }]
   }]);
-  assert.equal(saved.bodies[0].moons[0].position_angle_deg, 0);
-  assert.equal(saved.bodies[0].moons[0].perihelion_longitude_deg, 15.5);
+  // Version 2 lists a moon as its own body, after its planet.
+  assert.equal(saved.bodies[1].orbit.position_angle_deg, 0);
+  assert.equal(saved.bodies[1].orbit.perihelion_longitude_deg, 15.5);
   const schema = await import('../site/js/schema.js');
   const loaded = schema.loadSystem(saved);
   const moon = loaded.bodies.find(function (body) { return body.id === 'm1'; });

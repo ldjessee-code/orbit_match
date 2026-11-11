@@ -41,7 +41,9 @@ function assignGroup(list, angles) {
     if (storedStartRadians(body) != null) return;
     const partner = body.lagrange && body.lagrange.of;
     if (!partner || !angles.has(partner)) return;
-    angles.set(body.id, angles.get(partner) + Math.PI / 3);
+    // L4 leads its partner by 60 degrees and L5 trails it.
+    const trails = String(body.lagrange.point || '').toUpperCase() === 'L5';
+    angles.set(body.id, angles.get(partner) + (trails ? -Math.PI / 3 : Math.PI / 3));
   });
 }
 

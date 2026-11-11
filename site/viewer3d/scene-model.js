@@ -2,6 +2,7 @@ import { pos, hohmannDays, positionFromAngles } from '../js/kepler.js';
 import { displayAngleMap, ANGLE_MISSING_LINE } from '../js/display-angles.js';
 import { toThree, clampElevation, cameraPose } from './frame.js';
 import { hohmannArc } from './transfer-arc.js';
+import { CHROME_3D, DEFAULT_CHROME_3D } from '../themes/chrome-3d.js';
 
 const TAU = 2 * Math.PI;
 const SYSTEM_RIN = 1.6;
@@ -32,8 +33,14 @@ export const FALLBACK = {
   link: 'Open the SVG system view'
 };
 
+// Display color by spectral class. G stars keep their two shades. A type with
+// no class letter at the start draws as a G star.
+const CLASS_COLORS = { O: '#a9c4ff', B: '#c2d4ff', A: '#e4ecff', F: '#fff6e4', K: '#ffc98a', M: '#ff9e6a', L: '#d9683f', T: '#a8503a', Y: '#7a3c33' };
+
 export function starDisplayColor(spectype) {
-  const text = String(spectype == null ? '' : spectype).toUpperCase();
+  const text = String(spectype == null ? '' : spectype).toUpperCase().trim();
+  const lead = text.match(/^(?:SD)?([OBAFGKMLTY])(?=[\d.\s:IV+-]|$)/);
+  if (lead && CLASS_COLORS[lead[1]]) return CLASS_COLORS[lead[1]];
   const match = text.match(/G\s*([0-9])/);
   if (!match) return '#ffe0a0';
   const n = Number(match[1]);
@@ -41,29 +48,10 @@ export function starDisplayColor(spectype) {
   return '#ffe0a0';
 }
 
+// Page chrome comes from the theme file by name.
 export function themeChrome(themeName) {
-  if (themeName === 'mardat') {
-    return {
-      id: 'mardat',
-      starStyle: 'fiery',
-      starColor: '#ffcf6e',
-      space: { base: '#17143e', center: '#221c52', edge: '#0b0a24', dark: true },
-      panel: '#6B6F76',
-      text: '#f1f2f4',
-      accent: '#ff2e48',
-      title: '#173f96'
-    };
-  }
-  return {
-    id: 'empire',
-    starStyle: 'soft',
-    starColor: '#ffe0a0',
-    space: { base: '#5a6270', center: '#687282', edge: '#4b525e', dark: false },
-    panel: '#EEF1F5',
-    text: '#12202b',
-    accent: '#7FD3FF',
-    title: '#7FD3FF'
-  };
+  const chrome = Object.prototype.hasOwnProperty.call(CHROME_3D, themeName) ? CHROME_3D[themeName] : CHROME_3D[DEFAULT_CHROME_3D];
+  return JSON.parse(JSON.stringify(chrome));
 }
 
 function byId(system, id) {
@@ -97,7 +85,7 @@ export function bandEdgesKm(band) {
 export function isDrawableBand(band) {
   if (!band || band.draw === false) return false;
   const name = band.name == null ? '' : String(band.name);
-  if (/gap/i.test(name) || name === 'phoebe_like') return false;
+  if (/gap/i.test(name)) return false;
   const km = bandEdgesKm(band);
   return km.innerKm > 0 && km.outerKm > km.innerKm;
 }
@@ -155,6 +143,27 @@ export function moonletsKm(body) {
   return out;
 }
 
+function massKg(body) {
+  const physical = (body && body.physical) || {};
+  if (physical.mass_kg > 0) return physical.mass_kg;
+  if (physical.mass_earth > 0) return physical.mass_earth * 5.9722e24;
+  if (physical.mass_solar > 0) return physical.mass_solar * 1.98847e30;
+  return null;
+}
+
+// Where a ring moonlet is, in radians from +X. Moonlets have no stored angle,
+// so they start spread around the planet, and they orbit at the period its
+// mass gives. With no planet mass they stay put.
+export function moonletAngle(focus, moonlet, slot, total, tDays) {
+  const start = total > 0 ? (TAU * slot) / total : 0;
+  const kg = massKg(focus);
+  if (!(kg > 0) || !(moonlet.a_km > 0)) return start;
+  const metres = moonlet.a_km * 1000;
+  const periodDays = TAU * Math.sqrt((metres * metres * metres) / (6.6743e-11 * kg)) / 86400;
+  const t = typeof tDays === 'number' && Number.isFinite(tDays) ? tDays : 0;
+  return start + (TAU * t) / periodDays;
+}
+
 export function closeExtentKm(system, id) {
   const data = system || { bodies: [] };
   const focus = id && typeof id === 'object' ? id : byId(data, id);
@@ -182,6 +191,16 @@ export function closeExtentKm(system, id) {
   return maxKm;
 }
 
+// The body that orbits the star, for a body or any of its moons or stations.
+export function starAnchor(system, body) {
+  let at = body;
+  for (let i = 0; at && i < 8; i++) {
+    if (at.parent == null || at.parent === '') return at;
+    at = byId(system, at.parent);
+  }
+  return null;
+}
+
 function heliocentric(system) {
   return (system.bodies || []).filter(function (body) {
     return body.parent == null && body.kind !== 'belt' && body.orbit && typeof body.orbit.a_au === 'number' && Number.isFinite(body.orbit.a_au);
@@ -206,10 +225,29 @@ function usesAngle(body) {
   return !!(body && body.orbit && typeof body.orbit.position_angle_deg === 'number');
 }
 
-function spotAt(system, body, a, tDays, legacyRadians, periodFallback) {
+// A body at a Lagrange point with no stored angle sits 60 degrees from its
+// partner at every time: ahead at L4, behind at L5.
+function lagrangeSpot(system, body, a, tDays, periodFallback, depth) {
+  const lagrange = body.lagrange;
+  if (!lagrange || !lagrange.of || usesAngle(body) || typeof body.angle_deg === 'number' || depth > 4) return null;
+  const partner = byId(system, lagrange.of);
+  if (!partner || partner === body || !partner.orbit) return null;
+  const pa = typeof partner.orbit.a_au === 'number' ? partner.orbit.a_au : partner.orbit.a_km;
+  if (typeof pa !== 'number') return null;
+  const angles = displayAngleMap(system);
+  const there = spotAt(system, partner, pa, tDays, angles.get(partner.id) || 0, periodFallback, depth + 1);
+  const shift = String(lagrange.point || '').toUpperCase() === 'L5' ? -Math.PI / 3 : Math.PI / 3;
+  const angle = Math.atan2(there.y, there.x) + shift;
+  return { x: a * Math.cos(angle), y: a * Math.sin(angle) };
+}
+
+// periodFallback is used when the body has no period of its own.
+function spotAt(system, body, a, tDays, legacyRadians, periodFallback, depth) {
   const orbit = body.orbit || {};
   const e = orbit.e || 0;
   const period = orbit.period_days > 0 ? orbit.period_days : periodFallback;
+  const linked = lagrangeSpot(system, body, a, tDays, periodFallback, depth || 0);
+  if (linked) return linked;
   if (usesAngle(body)) {
     return positionFromAngles({
       a: a,
@@ -220,7 +258,41 @@ function spotAt(system, body, a, tDays, legacyRadians, periodFallback) {
       reference_deg: referenceDeg(system)
     }, tDays);
   }
-  return pos({ a: a, e: e, period_days: period, M0: legacyRadians || 0, w: 0 }, tDays);
+  const moving = period > 0;
+  const flat = pos({ a: a, e: e, period_days: moving ? period : 1, M0: legacyRadians || 0, w: 0 }, moving ? tDays : 0);
+  // The reference direction turns every body, with or without a stored angle.
+  const rot = (referenceDeg(system) * Math.PI) / 180;
+  if (!rot) return flat;
+  return { x: flat.x * Math.cos(rot) - flat.y * Math.sin(rot), y: flat.x * Math.sin(rot) + flat.y * Math.cos(rot) };
+}
+
+// Inclination tips the orbit about its line of nodes. Returns the height out
+// of the system plane, in the same units as the position.
+function inclined(body, spot) {
+  const orbit = body.orbit || {};
+  const i = typeof orbit.i_deg === 'number' ? (orbit.i_deg * Math.PI) / 180 : 0;
+  if (!i) return { x: spot.x, y: spot.y, h: 0 };
+  const node = typeof orbit.node_deg === 'number' ? (orbit.node_deg * Math.PI) / 180 : 0;
+  const c = Math.cos(node);
+  const s = Math.sin(node);
+  const along = spot.x * c + spot.y * s;
+  const across = -spot.x * s + spot.y * c;
+  return {
+    x: along * c - across * Math.cos(i) * s,
+    y: along * s + across * Math.cos(i) * c,
+    h: across * Math.sin(i)
+  };
+}
+
+function placeInclined(radial, body, spot) {
+  const tipped = inclined(body, spot);
+  if (!tipped.h) return placeAu(radial, spot.x, spot.y);
+  const r = Math.hypot(spot.x, spot.y);
+  if (!(r > 0)) return toThree(0, 0);
+  const k = radial(r) / r;
+  const placed = toThree(tipped.x * k, tipped.y * k);
+  placed.y = tipped.h * k;
+  return placed;
 }
 
 function distanceKnots(system) {
@@ -315,7 +387,10 @@ function beltFeaturesFromBody(body, radial) {
       depth: depth == null ? 0.85 : depth
     });
   });
-  const clumps = struct.resonant_clumps_with_eight_ball_au || {};
+  // Resonant clumps are keyed by the planet that makes them, so read any
+  // resonant_clumps_* entry, not one planet's name.
+  const clumpKey = Object.keys(struct).find(function (key) { return /^resonant_clumps/.test(key); });
+  const clumps = (clumpKey && struct[clumpKey]) || {};
   ['3:2', '2:1'].forEach(function (key) {
     const node = clumps[key];
     if (!node || node.draw === false) return;
@@ -377,7 +452,7 @@ function bodyRecord(body, position, radius) {
   const display = body.display || {};
   const record = {
     id: body.id,
-    name: body.name,
+    name: body.name || String(body.id),
     designation: body.designation == null ? '' : body.designation,
     kind: body.kind || '',
     parent: body.parent == null ? null : body.parent,
@@ -404,20 +479,30 @@ function markSubmap(system, body, record) {
   return record;
 }
 
-function epochLabel(system) {
+// The epoch as the file names it, then the days since it once the clock moves.
+function epochLabel(system, tDays) {
   const epoch = system.epoch;
+  let label;
   if (typeof epoch === 'string') {
     const text = epoch.trim();
-    return text ? text : 'TBD';
+    label = text ? text : 'TBD';
+  } else {
+    const obj = epoch || {};
+    label = obj.label || 'Epoch';
+    if (obj.canon === 'placeholder' && label.indexOf('placeholder') < 0) label += ' (placeholder)';
+    if (typeof obj.game_datetime === 'string') {
+      const when = obj.game_datetime.trim();
+      if (when) label += ' · ' + when;
+    }
   }
-  const obj = epoch || {};
-  let label = obj.label || 'T+0 (circa 1600 yrs hence)';
-  if (obj.canon === 'placeholder' && label.indexOf('placeholder') < 0) label += ' (placeholder)';
-  if (typeof obj.game_datetime === 'string') {
-    const when = obj.game_datetime.trim();
-    if (when) label += ' · ' + when;
-  }
-  return label;
+  return label + elapsedText(tDays);
+}
+
+export function elapsedText(tDays) {
+  const days = typeof tDays === 'number' && Number.isFinite(tDays) ? tDays : 0;
+  if (Math.abs(days) < 1e-9) return '';
+  const shown = Math.abs(days) >= 10 ? Math.round(days) : Math.round(days * 100) / 100;
+  return ' · day ' + (shown > 0 ? '+' : '') + shown + ' since the epoch';
 }
 
 function layerOn(view, name) {
@@ -489,7 +574,7 @@ function buildSystem(system, view, options) {
     const orbit = body.orbit;
     const angle = angles.get(body.id) || 0;
     const spot = spotAt(system, body, orbit.a_au, tDays, angle, 365.25);
-    return markSubmap(system, body, bodyRecord(body, placeAu(radial, spot.x, spot.y), visualRadius(body)));
+    return markSubmap(system, body, bodyRecord(body, placeInclined(radial, body, spot), visualRadius(body)));
   });
   const orbits = [];
   if (layerOn(view, 'orbits')) {
@@ -501,13 +586,10 @@ function buildSystem(system, view, options) {
       }
       seen.push(a);
       const angle = angles.get(body.id) || 0;
+      const mapPoint = function (x, y) { return placeInclined(radial, body, { x: x, y: y }); };
       const points = usesAngle(body)
-        ? sampleAngled(system, body, a, body.orbit.period_days || 365.25, 96, function (x, y) {
-          return placeAu(radial, x, y);
-        })
-        : sampleEllipse(a, body.orbit.e || 0, body.orbit.period_days || 365.25, angle, 96, function (x, y) {
-          return placeAu(radial, x, y);
-        });
+        ? sampleAngled(system, body, a, body.orbit.period_days || 365.25, 96, mapPoint)
+        : sampleEllipse(a, body.orbit.e || 0, body.orbit.period_days || 365.25, angle, 96, mapPoint);
       orbits.push({
         id: body.id,
         points: points
@@ -546,11 +628,12 @@ function buildSystem(system, view, options) {
     };
   }
   const transfers = [];
-  if (layerOn(view, 'transfers') && view.transfer && view.transfer.from && view.transfer.to) {
-    const from = byId(system, view.transfer.from);
-    const to = byId(system, view.transfer.to);
-    if (from && to && typeof from.orbit.a_au === 'number' && typeof to.orbit.a_au === 'number') {
-      const mass = star.mass_solar || 1;
+  if (layerOn(view, 'transfers') && view.transfer && view.transfer.from && view.transfer.to && view.transfer.from !== view.transfer.to) {
+    // A moon or a station travels with the body that orbits the star.
+    const from = starAnchor(system, byId(system, view.transfer.from));
+    const to = starAnchor(system, byId(system, view.transfer.to));
+    if (from && to && from !== to && typeof from.orbit.a_au === 'number' && typeof to.orbit.a_au === 'number') {
+      const mass = star.mass_solar > 0 ? star.mass_solar : 1;
       const hop = hohmannDays(from.orbit.a_au, to.orbit.a_au, mass);
       const r1Scene = sceneOrbitRadius(radial, from.orbit.a_au);
       const r2Scene = sceneOrbitRadius(radial, to.orbit.a_au);
@@ -561,8 +644,9 @@ function buildSystem(system, view, options) {
       const arc = hohmannArc(r1Scene, r2Scene, departure);
       transfers.push({
         id: 'hohmann',
-        from: from.id,
-        to: to.id,
+        from: view.transfer.from,
+        to: view.transfer.to,
+        mass_assumed: !(star.mass_solar > 0),
         color: '#6dffc8',
         days: hop.days,
         dv1_km_s: hop.dv1_km_s,
@@ -577,7 +661,7 @@ function buildSystem(system, view, options) {
   const azimuth = view.azimuth_deg || 0;
   return {
     star: {
-      name: star.name || 'Tau Ceti',
+      name: star.name || star.hostname || 'Star',
       spectype: star.spectype || '',
       color: starColor,
       radius: 0.7,
@@ -589,7 +673,7 @@ function buildSystem(system, view, options) {
     habitable: habitable,
     transfers: transfers,
     camera: cameraPose(elevation, azimuth, SYSTEM_DISTANCE),
-    epochLabel: epochLabel(system),
+    epochLabel: epochLabel(system, tDays),
     legendCorner: view.legend_corner || 'tl',
     distanceMode: mode,
     frame: 'system',
@@ -605,9 +689,7 @@ function closeM0(angles, body) {
 }
 
 function closeSpot(system, body, a, tDays, period, angles) {
-  if (usesAngle(body)) return spotAt(system, body, a, tDays, 0, period);
-  const orbit = body.orbit || {};
-  return pos({ a: a, e: orbit.e || 0, period_days: period, M0: closeM0(angles, body), w: 0 }, tDays);
+  return spotAt(system, body, a, tDays, closeM0(angles, body), period);
 }
 
 function buildClose(system, view, options, focus) {
@@ -627,6 +709,7 @@ function buildClose(system, view, options, focus) {
   children.forEach(function (body) {
     const orbit = body.orbit || {};
     const a = orbit.a_km;
+    // No period: one turn a day, the same fallback as the SVG close view.
     const period = orbit.period_days > 0 ? orbit.period_days : 1;
     const spot = closeSpot(system, body, a, tDays, period, angles);
     bodies.push(markSubmap(system, body, bodyRecord(body, toThree(spot.x * scale, spot.y * scale), visualRadius(body))));
@@ -654,26 +737,33 @@ function buildClose(system, view, options, focus) {
       });
     });
   }
-  const moonlets = moonletsKm(focus).map(function (moonlet) {
+  const listed = moonletsKm(focus);
+  const moonlets = listed.map(function (moonlet, index) {
+    const angle = moonletAngle(focus, moonlet, index, listed.length, tDays);
     return {
       id: moonlet.id,
       name: moonlet.name,
       a_km: moonlet.a_km,
       radius_km: moonlet.radius_km,
-      position: toThree(moonlet.a_km * scale, 0),
+      position: toThree(moonlet.a_km * scale * Math.cos(angle), moonlet.a_km * scale * Math.sin(angle)),
       angle_missing: true
     };
   });
   const chrome = themeChrome(view.theme);
+  // The trip is not drawn in a close view, but a card kept open for it still
+  // reads its numbers.
+  const trips = buildSystem(system, view, options).transfers.map(function (hop) {
+    return Object.assign({}, hop, { points: [], hidden: true });
+  });
   return {
     star: null,
     bodies: bodies,
     orbits: orbits,
     belts: [],
     habitable: null,
-    transfers: [],
+    transfers: trips,
     camera: cameraPose(clampElevation(view.elevation_deg), view.azimuth_deg || 0, CLOSE_DISTANCE),
-    epochLabel: epochLabel(system),
+    epochLabel: epochLabel(system, tDays),
     legendCorner: view.legend_corner || 'tl',
     distanceMode: mode,
     frame: focus.id,
@@ -922,7 +1012,7 @@ export function infoLines(system, id) {
   if (id === 'star') {
     const star = data.star || {};
     const lines = [];
-    lines.push(star.name || 'Star');
+    lines.push(star.name || star.hostname || 'Star');
     if (star.spectype) lines.push(String(star.spectype));
     if (typeof star.mass_solar === 'number') lines.push(String(star.mass_solar) + ' solar masses');
     if (typeof star.lum_solar === 'number') lines.push(String(star.lum_solar) + ' solar luminosities');
@@ -935,7 +1025,7 @@ export function infoLines(system, id) {
   const body = (data.bodies || []).find(function (item) { return item.id === id; });
   if (!body) return ['unknown'];
   const orbit = body.orbit || {};
-  const lines = [body.name];
+  const lines = [body.name || String(body.id)];
   if (body.designation) lines.push(String(body.designation));
   if (body.kind) lines.push(body.kind);
   if (typeof orbit.a_au === 'number') lines.push(auText(orbit.a_au));

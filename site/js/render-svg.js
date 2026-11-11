@@ -74,6 +74,13 @@ function byId(system, id) {
   return (system.bodies || []).find(function (body) { return body.id === id; });
 }
 
+// Belts the picture can place: both edges known.
+function edgedBelts(system) {
+  return (system.bodies || []).filter(function (body) {
+    return body.kind === 'belt' && body.orbit && typeof body.orbit.a_inner_au === 'number' && typeof body.orbit.a_outer_au === 'number';
+  });
+}
+
 function heliocentric(system) {
   return (system.bodies || []).filter(function (body) {
     return body.parent == null && body.kind !== 'belt' && typeof body.orbit.a_au === 'number';
@@ -104,10 +111,30 @@ function usesAngle(body) {
   return !!(body && body.orbit && typeof body.orbit.position_angle_deg === 'number');
 }
 
-function spotAt(system, body, a, tDays, legacyRadians) {
+// A body at a Lagrange point with no stored angle sits 60 degrees from its
+// partner at every time: ahead at L4, behind at L5.
+function lagrangeSpot(system, body, a, tDays, periodFallback, depth) {
+  const lagrange = body.lagrange;
+  if (!lagrange || !lagrange.of || usesAngle(body) || typeof body.angle_deg === 'number' || depth > 4) return null;
+  const partner = byId(system, lagrange.of);
+  if (!partner || partner === body || !partner.orbit) return null;
+  const pa = typeof partner.orbit.a_au === 'number' ? partner.orbit.a_au : partner.orbit.a_km;
+  if (typeof pa !== 'number') return null;
+  const there = spotAt(system, partner, pa, tDays, displayAngles(system).get(partner.id) || 0, periodFallback, depth + 1);
+  const shift = String(lagrange.point || '').toUpperCase() === 'L5' ? -Math.PI / 3 : Math.PI / 3;
+  const angle = Math.atan2(there.y, there.x) + shift;
+  return { x: a * Math.cos(angle), y: a * Math.sin(angle) };
+}
+
+// periodFallback is the period used when the body has none: 365.25 days
+// around the star, and 1 day in a close view, as the 3D view does.
+function spotAt(system, body, a, tDays, legacyRadians, periodFallback, depth) {
   const orbit = body.orbit || {};
   const e = orbit.e || 0;
-  const period = orbit.period_days > 0 ? orbit.period_days : 365.25;
+  const fallback = periodFallback == null ? 365.25 : periodFallback;
+  const period = orbit.period_days > 0 ? orbit.period_days : fallback;
+  const linked = lagrangeSpot(system, body, a, tDays, fallback, depth || 0);
+  if (linked) return linked;
   if (usesAngle(body)) {
     return positionFromAngles({
       a: a,
@@ -118,7 +145,11 @@ function spotAt(system, body, a, tDays, legacyRadians) {
       reference_deg: referenceDeg(system)
     }, tDays);
   }
-  return pos({ a: a, e: e, period_days: period, M0: legacyRadians || 0, w: 0 }, tDays);
+  const flat = pos({ a: a, e: e, period_days: period, M0: legacyRadians || 0, w: 0 }, tDays);
+  // The reference direction turns every body, with or without a stored angle.
+  const rot = (referenceDeg(system) * Math.PI) / 180;
+  if (!rot) return flat;
+  return { x: flat.x * Math.cos(rot) - flat.y * Math.sin(rot), y: flat.x * Math.sin(rot) + flat.y * Math.cos(rot) };
 }
 
 function schematicMap(distances, rIn, fit) {
@@ -150,6 +181,44 @@ function schematicMap(distances, rIn, fit) {
     }
     return rho[rho.length - 1];
   };
+}
+
+// True spacing: radius grows in step with AU, from the star's edge to the fit.
+function linearMap(distances, rIn, fit) {
+  let max = 0;
+  distances.forEach(function (n) { if (n > max) max = n; });
+  if (!(max > 0)) max = 1;
+  return function (r) { return (r / max) * fit; };
+}
+
+// Reference rings at round AU values, and the axis through the star.
+function grid(parts, distances, map, cx, cy, ratio, style) {
+  let max = 0;
+  distances.forEach(function (n) { if (n > max) max = n; });
+  if (!(max > 0)) return;
+  const color = style.grid || style.border || style.muted;
+  const steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
+  steps.filter(function (au) { return au <= max * 1.05; }).forEach(function (au) {
+    const rx = map(au);
+    parts.push('<ellipse data-role="grid" cx="' + cx + '" cy="' + cy + '" rx="' + num(rx) + '" ry="' + num(rx * ratio) + '" fill="none" stroke="' + color + '" stroke-width="0.5" stroke-dasharray="1 6" pointer-events="none"/>');
+    parts.push('<text data-role="grid" x="' + num(cx + rx + 4) + '" y="' + (cy - 4) + '" fill="' + style.muted + '" font-size="10" pointer-events="none">' + au + ' AU</text>');
+  });
+  const reach = map(max);
+  parts.push('<line data-role="grid" x1="' + num(cx - reach) + '" y1="' + cy + '" x2="' + num(cx + reach) + '" y2="' + cy + '" stroke="' + color + '" stroke-width="0.5" pointer-events="none"/>');
+}
+
+function eccentricRing(parts, system, body, place, style) {
+  const orbit = body.orbit;
+  const period = orbit.period_days > 0 ? orbit.period_days : 365.25;
+  const legacy = displayAngles(system).get(body.id) || 0;
+  const pts = [];
+  for (let i = 0; i <= 96; i++) {
+    const spot = spotAt(system, body, orbit.a_au, (period * i) / 96, usesAngle(body) ? 0 : legacy);
+    pts.push(place(spot.x, spot.y));
+  }
+  const d = polyline(pts) + ' Z';
+  const call = ' data-callout="body:' + xml(body.id) + '"';
+  parts.push('<g><title>' + auText(orbit.a_au) + ' AU</title><path data-id="' + xml(body.id) + '" data-au="' + auText(orbit.a_au) + '"' + call + ' d="' + d + '" fill="none" stroke="transparent" stroke-width="12"/><path data-role="orbit" data-id="' + xml(body.id) + '" d="' + d + '" fill="none" stroke="' + style.orbit + '" stroke-width="1" pointer-events="none"/></g>');
 }
 
 function diskRadius(body) {
@@ -205,7 +274,9 @@ function renderSystem(system, view, theme, style) {
     if (typeof orbit.a_inner_au === 'number') distances.push(orbit.a_inner_au);
     if (typeof orbit.a_outer_au === 'number') distances.push(orbit.a_outer_au);
   });
-  const map = schematicMap(distances, rIn, fit);
+  // distance_mode "linear" (or "true") spaces orbits by their real AU.
+  const linear = view.distance_mode === 'linear' || view.distance_mode === 'true';
+  const map = linear ? linearMap(distances, rIn, fit) : schematicMap(distances, rIn, fit);
   const place = function (x, y) {
     const r = Math.hypot(x, y);
     const scale = r === 0 ? 1 : map(r) / r;
@@ -214,11 +285,17 @@ function renderSystem(system, view, theme, style) {
   const angles = displayAngles(system);
   const parts = [];
   parts.push(openSvg(style, theme));
+  if (view.layers && view.layers.grid === true) grid(parts, distances, map, CX, CY, ratio, style);
   if (layer(view, 'habitable')) band(parts, system, map, CX, CY, ratio, style);
   if (layer(view, 'belts')) belts(parts, system, place, style);
   if (layer(view, 'orbits')) {
     const seen = new Set();
     heliocentric(system).forEach(function (body) {
+      // An eccentric orbit is drawn along its real path, as the 3D view does.
+      if ((body.orbit.e || 0) >= 0.05) {
+        eccentricRing(parts, system, body, place, style);
+        return;
+      }
       const key = auText(body.orbit.a_au);
       if (seen.has(key)) return;
       seen.add(key);
@@ -238,10 +315,10 @@ function renderSystem(system, view, theme, style) {
   markers.filter(function (item) { return item.at.sy >= CY; }).forEach(function (item) { bodyMark(parts, item, theme, style); });
   if (layer(view, 'labels')) {
     markers.forEach(function (item) { nameTag(parts, item, style); });
-    (system.bodies || []).filter(function (body) { return body.kind === 'belt'; }).forEach(function (body) {
-      const mid = ((body.orbit.a_inner_au || 0) + (body.orbit.a_outer_au || 0)) / 2;
+    edgedBelts(system).forEach(function (body) {
+      const mid = (body.orbit.a_inner_au + body.orbit.a_outer_au) / 2;
       const at = place(mid, 0.15 * mid);
-      parts.push('<text data-callout="body:' + xml(body.id) + '" x="' + num(at.sx) + '" y="' + num(at.sy) + '" fill="' + style.text + '" font-size="14">' + xml(body.name) + '</text>');
+      parts.push('<text data-callout="body:' + xml(body.id) + '" x="' + num(at.sx) + '" y="' + num(at.sy) + '" fill="' + style.text + '" font-size="14">' + xml(nameOf(body)) + '</text>');
     });
   }
   legend(parts, system, view, style, theme, 'system');
@@ -266,11 +343,8 @@ function renderSystem(system, view, theme, style) {
 function childKmSpot(system, body, tDays, angles) {
   const orbit = body.orbit || {};
   const a = orbit.a_km || 0;
-  const e = orbit.e > 0 ? orbit.e : 0;
-  const period = orbit.period_days > 0 ? orbit.period_days : 1;
-  if (usesAngle(body)) return spotAt(system, body, a, tDays, 0);
   const m0 = angles && angles.has(body.id) ? angles.get(body.id) : 0;
-  return pos({ a: a, e: e, period_days: period, M0: m0, w: 0 }, tDays);
+  return spotAt(system, body, a, tDays, usesAngle(body) ? 0 : m0, 1);
 }
 
 function drawCloseRings(parts, focus, px, ratio, cx, cy, style) {
@@ -304,11 +378,18 @@ function renderClose(system, view, theme, style, focus) {
   const angles = displayAngles(system);
   parts.push(openSvg(style, theme));
   drawCloseRings(parts, focus, px, ratio, CX, CY, style);
-  const sync = children.filter(function (body) { return body.kind === 'structure' && body.orbit.a_km; });
-  if (sync.length && layer(view, 'structures')) {
-    ring(parts, CX, CY, sync[0].orbit.a_km * px, ratio, style.orbit, null, sync[0].id);
-    const labelAt = place(sync[0].orbit.a_km, 0);
-    parts.push('<text x="' + num(labelAt.sx + 8) + '" y="' + num(labelAt.sy - 8) + '" fill="' + style.muted + '" font-size="12">' + Math.round(sync[0].orbit.a_km) + ' km</text>');
+  // One ring for each distance a structure orbits at. Stations that share a
+  // distance share its ring.
+  if (layer(view, 'structures')) {
+    const seenKm = new Set();
+    children.filter(function (body) { return body.kind === 'structure' && body.orbit.a_km; }).forEach(function (body) {
+      const key = Math.round(body.orbit.a_km * 1000);
+      if (seenKm.has(key)) return;
+      seenKm.add(key);
+      ring(parts, CX, CY, body.orbit.a_km * px, ratio, style.orbit, null, body.id);
+      const labelAt = place(body.orbit.a_km, 0);
+      parts.push('<text x="' + num(labelAt.sx + 8) + '" y="' + num(labelAt.sy - 8) + '" fill="' + style.muted + '" font-size="12">' + Math.round(body.orbit.a_km) + ' km</text>');
+    });
   }
   if (layer(view, 'orbits')) {
     children.filter(function (body) { return body.kind !== 'structure'; }).forEach(function (body) {
@@ -335,8 +416,11 @@ function renderClose(system, view, theme, style, focus) {
       submap: hasSubmap(system, body.id)
     });
     if (e >= 0.1 && layer(view, 'labels')) {
+      // The periapsis lies along the longitude of perihelion, turned by the
+      // reference direction.
       const peri = a * (1 - e);
-      const pe = place(peri, 0);
+      const w = ((usesAngle(body) && typeof body.orbit.perihelion_longitude_deg === 'number' ? body.orbit.perihelion_longitude_deg : 0) + (usesAngle(body) ? referenceDeg(system) : 0)) * Math.PI / 180;
+      const pe = place(peri * Math.cos(w), peri * Math.sin(w));
       parts.push('<text x="' + num(pe.sx + 8) + '" y="' + num(pe.sy + 16) + '" fill="' + style.text + '" font-size="12">' + Math.round(peri) + ' km</text>');
     }
   });
@@ -489,25 +573,82 @@ function departureRadians(system, body, tDays, angles) {
   return angles.get(body.id) || 0;
 }
 
-function transfer(parts, system, view, place, style, angles, tDays) {
+// The drive for the fusion card. A view's transfer can set thrust_g and
+// budget_km_s. These are the defaults.
+export const FUSION_DRIVE = { thrust_g: 0.01, budget_km_s: 150 };
+
+function driveOf(view) {
+  const spec = (view && view.transfer) || {};
+  const g = typeof spec.thrust_g === 'number' && spec.thrust_g > 0 ? spec.thrust_g : FUSION_DRIVE.thrust_g;
+  const budget = typeof spec.budget_km_s === 'number' && spec.budget_km_s > 0 ? spec.budget_km_s : FUSION_DRIVE.budget_km_s;
+  return { thrust_g: g, acc: g * G0, budget_m_s: budget * 1000 };
+}
+
+// The body that orbits the star, for a body or any of its moons or stations.
+function starAnchor(system, body) {
+  let at = body;
+  for (let i = 0; at && i < 8; i++) {
+    if (at.parent == null || at.parent === '') return at;
+    at = byId(system, at.parent);
+  }
+  return null;
+}
+
+// One trip, as both the picture and the card read it: the two ends, the
+// Hohmann numbers, the departure angle on this day, and the arc in AU. A
+// moon or a station travels with the body that orbits the star. A trip from
+// a body to itself is no trip.
+function tripPlan(system, view, tDays, angles) {
   const spec = view.transfer;
-  if (!spec || !spec.from || !spec.to) return;
-  const from = byId(system, spec.from);
-  const to = byId(system, spec.to);
-  if (!from || !to || !(from.orbit.a_au > 0) || !(to.orbit.a_au > 0)) return;
-  const mass = system.star && system.star.mass_solar ? system.star.mass_solar : 1;
+  if (!spec || !spec.from || !spec.to || spec.from === spec.to) return null;
+  const named = { from: byId(system, spec.from), to: byId(system, spec.to) };
+  if (!named.from || !named.to) return null;
+  const from = starAnchor(system, named.from);
+  const to = starAnchor(system, named.to);
+  if (!from || !to || from === to || !(from.orbit.a_au > 0) || !(to.orbit.a_au > 0)) return null;
+  const massGiven = system.star && system.star.mass_solar > 0;
+  const mass = massGiven ? system.star.mass_solar : 1;
   const hop = hohmannDays(from.orbit.a_au, to.orbit.a_au, mass);
   const ang = departureRadians(system, from, tDays, angles);
-  const pts = [];
+  // Outward the arc leaves at periapsis. Inward it leaves at apoapsis, so it
+  // starts at the origin either way.
+  const outward = to.orbit.a_au >= from.orbit.a_au;
+  const arc = [];
   for (let i = 0; i <= 80; i++) {
     const nu = (Math.PI * i) / 80;
-    const r = hop.at_au * (1 - hop.e * hop.e) / (1 + hop.e * Math.cos(nu));
-    pts.push(place(r * Math.cos(ang + nu), r * Math.sin(ang + nu)));
+    const r = hop.at_au * (1 - hop.e * hop.e) / (1 + (outward ? 1 : -1) * hop.e * Math.cos(nu));
+    arc.push([r * Math.cos(ang + nu), r * Math.sin(ang + nu)]);
   }
+  return {
+    named: named,
+    from: from,
+    to: to,
+    hop: hop,
+    ang: ang,
+    arc: arc,
+    massAssumed: !massGiven,
+    drive: driveOf(view),
+    tDays: tDays
+  };
+}
+
+function flyPlan(system, plan, angles) {
+  if (!plan) return null;
+  if (!('flown' in plan)) {
+    plan.flown = fuse(plan.from, plan.to, plan.ang, departureRadians(system, plan.to, plan.tDays, angles), system, plan.tDays, plan.drive);
+  }
+  return plan.flown;
+}
+
+function transfer(parts, system, view, place, style, angles, tDays) {
+  const plan = tripPlan(system, view, tDays, angles);
+  if (!plan) return;
+  const hop = plan.hop;
+  const pts = plan.arc.map(function (pair) { return place(pair[0], pair[1]); });
   const d = polyline(pts);
   parts.push('<path data-callout="transfer:hohmann" d="' + d + '" fill="none" stroke="transparent" stroke-width="12"/>');
   parts.push('<path data-role="hohmann" data-days="' + hop.days.toFixed(0) + '" d="' + d + '" fill="none" stroke="' + style.hohmann + '" stroke-width="1.5" stroke-dasharray="' + (style.hohmann_dash || '8 6') + '" pointer-events="none"/>');
-  const flown = fuse(from, to, ang, departureRadians(system, to, tDays, angles), system);
+  const flown = flyPlan(system, plan, angles);
   if (flown) {
     const burn = Math.max(1, Math.round(40 * flown.tb / flown.T));
     const all = sampleFusion(flown, place);
@@ -519,32 +660,24 @@ function transfer(parts, system, view, place, style, angles, tDays) {
   }
 }
 
-function fuse(from, to, fromAngle, toAngle, system) {
+// The fusion trip leaving on day tDays. A trip the drive cannot make is null,
+// and the card says no matched burn.
+function fuse(from, to, fromAngle, toAngle, system, tDays, drive) {
   try {
     const dep = xy(from, fromAngle, system);
     const tgt = xy(to, toAngle, system);
-    return fusionMatched(dep, tgt, 0, 0.01 * G0, 150000, AU_M);
+    const use = drive || driveOf(null);
+    const flown = fusionMatched(dep, tgt, tDays || 0, use.acc, use.budget_m_s, AU_M);
+    return flown && flown.ok !== false ? flown : null;
   } catch (err) {
     return null;
   }
 }
 
 function xy(body, angle, system) {
-  if (usesAngle(body)) {
-    return function (t) {
-      const spot = spotAt(system, body, body.orbit.a_au, t, 0);
-      return [spot.x, spot.y];
-    };
-  }
-  const orbit = {
-    a: body.orbit.a_au,
-    e: body.orbit.e || 0,
-    period_days: body.orbit.period_days || 365.25,
-    M0: angle,
-    w: 0
-  };
+  const legacy = usesAngle(body) ? 0 : angle;
   return function (t) {
-    const spot = pos(orbit, t);
+    const spot = spotAt(system, body, body.orbit.a_au, t, legacy);
     return [spot.x, spot.y];
   };
 }
@@ -602,7 +735,7 @@ function radialTag(parts, item, cx, cy, style) {
 }
 
 function labelName(item) {
-  return item && item.submap ? item.body.name + ' ·' : item.body.name;
+  return item && item.submap ? nameOf(item.body) + ' ·' : nameOf(item.body);
 }
 
 function submapAttr(item) {
@@ -613,7 +746,7 @@ function nameTag(parts, item, style) {
   const reach = labelReach(item);
   const x = item.at.sx + reach + 8;
   const y = item.at.sy - 6;
-  parts.push('<text data-name="' + xml(item.body.id) + '" data-callout="body:' + xml(item.body.id) + '" x="' + num(x) + '" y="' + num(y) + '" fill="' + style.text + '" font-size="14">' + xml(item.body.name) + '</text>');
+  parts.push('<text data-name="' + xml(item.body.id) + '" data-callout="body:' + xml(item.body.id) + '" x="' + num(x) + '" y="' + num(y) + '" fill="' + style.text + '" font-size="14">' + xml(nameOf(item.body)) + '</text>');
   if (item.body.lagrange && item.body.lagrange.point) {
     parts.push('<text x="' + num(x) + '" y="' + num(y + 16) + '" fill="' + style.muted + '" font-size="12">' + xml(item.body.lagrange.point) + '</text>');
   }
@@ -625,7 +758,7 @@ function legend(parts, system, view, style, theme, mode, listed) {
     heliocentric(system).forEach(function (body) {
       rows.push(legendRow(body, auText(body.orbit.a_au) + ' AU', theme));
     });
-    (system.bodies || []).filter(function (body) { return body.kind === 'belt'; }).forEach(function (body) {
+    edgedBelts(system).forEach(function (body) {
       rows.push(legendRow(body, auText(body.orbit.a_inner_au) + '\u2013' + auText(body.orbit.a_outer_au) + ' AU', theme));
     });
   } else {
@@ -635,12 +768,21 @@ function legend(parts, system, view, style, theme, mode, listed) {
       rows.push(legendRow(body, dist, theme));
     });
   }
-  const x = 24;
-  const y = 24;
+  const linear = view.distance_mode === 'linear' || view.distance_mode === 'true';
   const notes = mode === 'system'
-    ? ['Schematic distances.', 'Angles are for reading, not a date.']
+    ? [linear ? 'True distances.' : 'Schematic distances.', 'Angles are for reading, not a date.']
     : ['Linear kilometres.', 'Moons, rings, and the disc share one scale.'];
+  // The legend fits the picture. Rows that do not fit are counted instead.
+  const room = Math.floor((H - 48 - 64 - notes.length * 16) / 18);
+  if (rows.length > room) {
+    const hidden = rows.length - (room - 1);
+    rows.length = room - 1;
+    rows.push({ id: '', name: 'and ' + hidden + ' more', dist: '', color: 'none', more: true });
+  }
   const height = 64 + rows.length * 18 + notes.length * 16;
+  const corner = String(view.legend_corner || 'tl');
+  const x = corner.charAt(1) === 'r' ? W - 24 - 300 : 24;
+  const y = corner.charAt(0) === 'b' ? H - 24 - height : 24;
   parts.push('<g id="legend">');
   parts.push('<rect x="' + x + '" y="' + y + '" width="300" height="' + height + '" rx="8" fill="' + style.surface + '" stroke="' + style.border + '" stroke-width="1"/>');
   parts.push('<rect x="' + (x + 16) + '" y="' + (y + 28) + '" width="72" height="2" fill="' + theme.accent + '"/>');
@@ -648,6 +790,10 @@ function legend(parts, system, view, style, theme, mode, listed) {
   parts.push('<text x="' + (x + 190) + '" y="' + (y + 22) + '" fill="' + style.muted + '" font-size="12">' + (mode === 'system' ? 'True AU' : 'Distance') + '</text>');
   rows.forEach(function (row, i) {
     const yy = y + 48 + i * 18;
+    if (row.more) {
+      parts.push('<text x="' + (x + 34) + '" y="' + yy + '" fill="' + style.muted + '" font-size="12">' + xml(row.name) + '</text>');
+      return;
+    }
     parts.push('<circle data-swatch="' + xml(row.id) + '" data-callout="body:' + xml(row.id) + '" cx="' + (x + 22) + '" cy="' + (yy - 4) + '" r="4.5" fill="' + row.color + '" stroke="' + style.muted + '" stroke-width="1"/>');
     parts.push('<text x="' + (x + 34) + '" y="' + yy + '" fill="' + style.text + '" font-size="12">' + xml(row.name) + '</text>');
     parts.push('<text x="' + (x + 190) + '" y="' + yy + '" fill="' + style.muted + '" font-size="12" font-family="ui-monospace, Cascadia Mono, Consolas, monospace">' + xml(row.dist) + '</text>');
@@ -660,7 +806,7 @@ function legend(parts, system, view, style, theme, mode, listed) {
 }
 
 function legendRow(body, dist, theme) {
-  return { id: body.id, name: body.name, dist: dist, color: fillFor(body, theme) };
+  return { id: body.id, name: nameOf(body), dist: dist, color: fillFor(body, theme) };
 }
 
 function cardKey(id) {
@@ -691,9 +837,7 @@ function drawCallouts(parts, ctx) {
 function calloutBlock(id, ctx) {
   if (id === 'star' || id === 'body:star') return starBlock(ctx);
   if (id === 'transfer:hohmann' || id === 'transfer:fusion') return transferBlock(id, ctx);
-  const split = String(id).split(':');
-  const kind = split[0];
-  const bodyId = split.slice(1).join(':');
+  const bodyId = String(id).split(':').slice(1).join(':');
   const body = byId(ctx.system, bodyId);
   if (!body) return null;
   return bodyBlock(body, ctx);
@@ -734,11 +878,11 @@ function bodyBlock(body, ctx) {
   if (body.lagrange && body.lagrange.point) lines.push(String(body.lagrange.point));
   if (angleIsMissing(body)) lines.push(ANGLE_MISSING_LINE);
   (ctx.system.bodies || []).filter(function (item) { return item.parent === body.id; }).slice(0, 6).forEach(function (item) {
-    lines.push(item.name);
+    lines.push(nameOf(item));
   });
   return {
     id: 'body:' + body.id,
-    title: body.name,
+    title: nameOf(body),
     lines: lines.length ? lines : [body.kind || 'Body'],
     color: fillFor(body, ctx.theme),
     anchor: bodyAnchor(body, ctx)
@@ -763,41 +907,44 @@ function bodyAnchor(body, ctx) {
   return { x: ctx.CX, y: ctx.CY, rx: ctx.focusR || ctx.rStar || 8, ry: ctx.focusR || ctx.rStar || 8 };
 }
 
+// The card reads the same trip the picture draws, on the same day.
 function transferBlock(id, ctx) {
-  const spec = ctx.view.transfer;
-  if (!spec || !spec.from || !spec.to) return null;
-  const from = byId(ctx.system, spec.from);
-  const to = byId(ctx.system, spec.to);
-  if (!from || !to || !(from.orbit.a_au > 0) || !(to.orbit.a_au > 0)) return null;
-  const mass = ctx.system.star && ctx.system.star.mass_solar ? ctx.system.star.mass_solar : 1;
-  const hop = hohmannDays(from.orbit.a_au, to.orbit.a_au, mass);
-  const ang = (ctx.angles && ctx.angles.get(from.id)) || 0;
-  const flown = fuse(from, to, ang, (ctx.angles && ctx.angles.get(to.id)) || 0);
+  const tDays = clockDays(ctx.view);
+  const angles = ctx.angles || displayAngles(ctx.system);
+  const plan = tripPlan(ctx.system, ctx.view, tDays, angles);
+  if (!plan) return null;
+  const hop = plan.hop;
+  const flown = flyPlan(ctx.system, plan, angles);
   const fusionLine = flown ? flown.days.toFixed(0) + ' d at this spacing' : 'No matched burn at this spacing';
   const hohmann = id === 'transfer:hohmann';
   const lines = hohmann
     ? ['Hohmann ' + hop.days.toFixed(0) + ' d', hop.dv1_km_s.toFixed(1) + ' + ' + hop.dv2_km_s.toFixed(1) + ' km/s', fusionLine]
-    : ['Fusion 0.01 g, ballpark', fusionLine];
+    : ['Fusion ' + plan.drive.thrust_g + ' g, ballpark', fusionLine];
+  if (plan.massAssumed) lines.push('Star mass not given: 1 solar mass assumed');
   return {
     id: id,
-    title: from.name + ' to ' + to.name,
+    title: nameOf(plan.named.from) + ' to ' + nameOf(plan.named.to),
     lines: lines,
     color: hohmann ? ctx.style.hohmann : ctx.style.fusion,
-    anchor: transferAnchor(id, ctx, from, hop, ang, flown)
+    anchor: transferAnchor(id, ctx, plan, flown)
   };
 }
 
-function transferAnchor(id, ctx, from, hop, ang, flown) {
+// The leader ends on the drawn arc: its middle point on this day.
+function transferAnchor(id, ctx, plan, flown) {
   if (!ctx.place || !ctx.heliocentric) return { x: ctx.CX, y: ctx.CY, r: 0 };
   if (id === 'transfer:fusion' && flown) {
     const mid = flown.at(flown.T * 0.5);
     const at = ctx.place(mid[0], mid[1]);
     return { x: at.sx, y: at.sy, r: 0 };
   }
-  const nu = Math.PI / 2;
-  const r = hop.at_au * (1 - hop.e * hop.e) / (1 + hop.e * Math.cos(nu));
-  const at = ctx.place(r * Math.cos(ang + nu), r * Math.sin(ang + nu));
+  const mid = plan.arc[Math.floor(plan.arc.length / 2)];
+  const at = ctx.place(mid[0], mid[1]);
   return { x: at.sx, y: at.sy, r: 0 };
+}
+
+function nameOf(body) {
+  return body && body.name ? body.name : String(body && body.id);
 }
 
 function paintCard(parts, x, y, w, h, block, style) {

@@ -1,7 +1,7 @@
 {
   "orbit_match_stability": 1,
   "lore_version": "v2.41c",
-  "source": "F:\\Dropbox\\Projects\\Turquenish\\systems\\tauCet\\Tau_Cet_system_v2.md",
+  "source": "Turquenish/systems/tauCet/Tau_Cet_system_v2.md",
   "moons": {
     "drawn": {
       "a_km": { "shudder": 151060, "der": 240000 },

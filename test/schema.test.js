@@ -196,7 +196,7 @@ test('tau ceti fixture matches the v2.41c copy list', async function () {
   const raw = readJson(fixturePath);
   const loaded = schema.loadSystem(raw);
   assert.equal(loaded.lore.version, 'v2.41c');
-  assert.equal(loaded.lore.source, 'F:\\Dropbox\\Projects\\Turquenish\\systems\\tauCet\\Tau_Cet_system_v2.md');
+  assert.equal(loaded.lore.source, 'Turquenish/systems/tauCet/Tau_Cet_system_v2.md');
   assert.deepEqual(loaded.lore.copied, Object.keys(copied));
   for (const dotted of loaded.lore.copied) {
     assert.equal(valueAt(loaded, dotted), copied[dotted], dotted);
@@ -251,6 +251,7 @@ test('angle_deg stays put and position_angle round-trips on a moon', async funct
 test('stability note is the v2.41c moon run', function () {
   const note = readJson(stabilityPath);
   const text = JSON.stringify(note);
+  assert.equal(note.source, 'Turquenish/systems/tauCet/Tau_Cet_system_v2.md');
   assert.match(text, /20,000/);
   assert.match(text, /2:1/);
   assert.doesNotMatch(text, /4\.5 year/);

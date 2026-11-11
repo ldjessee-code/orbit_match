@@ -70,7 +70,11 @@ function withoutAngleEdits(data) {
   const copy = JSON.parse(JSON.stringify(data));
   delete copy.reference_direction;
   delete copy.epoch;
-  if (copy.lore && typeof copy.lore === 'object') delete copy.lore.angles;
+  if (copy.lore && typeof copy.lore === 'object') {
+    delete copy.lore.angles;
+    // The start snapshot still has the old personal path. The published path is checked exactly.
+    delete copy.lore.source;
+  }
   (copy.bodies || []).forEach(function (body) {
     if (body.orbit) {
       delete body.orbit.position_angle_deg;
@@ -127,7 +131,7 @@ test('the system file stores LadyT\'s ten rows, the epoch, and the fixed axis', 
   assert.equal(raw.lore.angles.locked, '2026-10-31');
   assert.equal(raw.lore.angles.epoch, '3629-01-01 00:00:01');
   assert.equal(raw.lore.angles.prepared_by, 'LadyT');
-  assert.equal(raw.lore.angles.source, 'F:\\Dropbox\\Projects\\Turquenish\\review\\tau_ceti_angles_for_viewer_20261031.md');
+  assert.equal(raw.lore.angles.source, 'Turquenish/review/tau_ceti_angles_for_viewer_20261031.md');
   const stations = { haven: 0, yard: 110, watch: 155 };
   Object.keys(stations).forEach(function (id) {
     const body = bodyById(raw, id);
@@ -168,6 +172,7 @@ test('every field except the new angles, epoch, axis, and provenance matches the
   assert.equal(start.epoch.label, 'T+0 (circa 1600 yrs hence)');
   assert.equal(start.epoch.game_datetime, undefined);
   assert.doesNotMatch(read(startRel), /position_angle_deg|perihelion_longitude_deg|reference_direction|3629-01-01/);
+  assert.equal(current.lore.source, 'Turquenish/systems/tauCet/Tau_Cet_system_v2.md');
   assert.deepEqual(withoutAngleEdits(current), withoutAngleEdits(start));
 });
 

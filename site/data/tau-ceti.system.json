@@ -3,7 +3,7 @@
   "kind": "system",
   "lore": {
     "version": "v2.41c",
-    "source": "F:\\Dropbox\\Projects\\Turquenish\\systems\\tauCet\\Tau_Cet_system_v2.md",
+    "source": "Turquenish/systems/tauCet/Tau_Cet_system_v2.md",
     "copied": [
       "star.hostname",
       "star.setting_name",
@@ -95,7 +95,7 @@
       "bodies.b2.orbit.a_outer_au"
     ],
     "angles": {
-      "source": "F:\\Dropbox\\Projects\\Turquenish\\review\\tau_ceti_angles_for_viewer_20261031.md",
+      "source": "Turquenish/review/tau_ceti_angles_for_viewer_20261031.md",
       "version": "v2.41o",
       "locked": "2026-10-31",
       "epoch": "3629-01-01 00:00:01",

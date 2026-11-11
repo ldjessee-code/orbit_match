@@ -48,9 +48,34 @@ export function isLoreSystem(record) {
     && record.kind !== 'system_handoff');
 }
 
+// The flat record the star map writes, or the { handoff: 1, star } file that
+// BRIEF.md documents.
 export function isHandoff(record) {
   return !!(record && typeof record === 'object' && !Array.isArray(record)
-    && record.kind === 'system_handoff');
+    && (record.kind === 'system_handoff' || isBriefHandoff(record)));
+}
+
+function isBriefHandoff(record) {
+  return !!(record && typeof record === 'object' && !Array.isArray(record)
+    && record.handoff != null && record.orbit_match == null
+    && record.star && typeof record.star === 'object' && !Array.isArray(record.star));
+}
+
+// The BRIEF.md handoff as a system: the star and card as given, the arrivals,
+// and no bodies until the builder adds them.
+function systemFromBrief(handoff) {
+  const system = {
+    orbit_match: 2,
+    kind: 'system',
+    source: 'handoff',
+    star: copy(handoff.star),
+    bodies: Array.isArray(handoff.bodies) ? copy(handoff.bodies) : []
+  };
+  if (handoff.known_planet_count != null) system.known_planet_count = handoff.known_planet_count;
+  if (handoff.card && typeof handoff.card === 'object') system.card = copy(handoff.card);
+  if (Array.isArray(handoff.arrivals)) system.arrivals = copy(handoff.arrivals);
+  if (handoff.system_file != null) system.system_file = handoff.system_file;
+  return system;
 }
 
 export function safeSystemFile(name) {
@@ -60,7 +85,11 @@ export function safeSystemFile(name) {
   return text;
 }
 
+// A blank value stays blank. Number(null) and Number('') are 0, which would
+// invent a mass or a distance.
 function finite(value) {
+  if (value == null || typeof value === 'boolean') return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -102,20 +131,21 @@ function starFromHandoff(handoff) {
   return star;
 }
 
+// Planets and bodies, belts included. A body listed in both arrays appears
+// once, by id.
 function explicitPlanets(handoff) {
   const list = [];
-  if (Array.isArray(handoff.planets)) {
-    handoff.planets.forEach(function (planet) {
-      if (planet && typeof planet === 'object') list.push(planet);
-    });
-  }
-  if (Array.isArray(handoff.bodies)) {
-    handoff.bodies.forEach(function (body) {
-      if (!body || typeof body !== 'object') return;
-      if (body.kind === 'belt') return;
-      list.push(body);
-    });
-  }
+  const seen = new Set();
+  const add = function (body) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return;
+    if (body.id != null && body.id !== '') {
+      if (seen.has(body.id)) return;
+      seen.add(body.id);
+    }
+    list.push(body);
+  };
+  if (Array.isArray(handoff.planets)) handoff.planets.forEach(add);
+  if (Array.isArray(handoff.bodies)) handoff.bodies.forEach(add);
   return list;
 }
 
@@ -179,6 +209,7 @@ function buildFromHandoff(handoff) {
 }
 
 export function systemFromHandoff(handoff) {
+  if (isBriefHandoff(handoff)) return loadSystem(systemFromBrief(handoff));
   return loadSystem(buildFromHandoff(handoff));
 }
 
@@ -247,7 +278,7 @@ export function applyHandoffOverlay(system, handoff) {
   if (!system || !isHandoff(handoff)) return system;
   const star = system.star && typeof system.star === 'object' ? system.star : {};
   system.star = star;
-  fillMissing(star, starFromHandoff(handoff));
+  fillMissing(star, isBriefHandoff(handoff) ? handoff.star : starFromHandoff(handoff));
   if ((system.tier == null || system.tier === '') && handoff.tier != null) system.tier = handoff.tier;
   if (system.exoplanet_count == null && handoff.exoplanet_count != null) {
     system.exoplanet_count = handoff.exoplanet_count;

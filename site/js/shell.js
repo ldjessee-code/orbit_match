@@ -6,6 +6,31 @@ export function starMapHref(cfg) {
   return '';
 }
 
+const PEER_KEY = 'orbit-match-jumpgate';
+
+function webAddress(value) {
+  if (!value) return '';
+  try {
+    const url = new URL(String(value));
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
+  } catch (err) {
+    return '';
+  }
+}
+
+// The star map page: ?jumpgate= first (and remembered), then the address this
+// browser remembered, then config.json.
+export function peerPage(search, cfg) {
+  const asked = webAddress(new URLSearchParams(search || '').get('jumpgate'));
+  if (asked) {
+    try { window.localStorage.setItem(PEER_KEY, asked); } catch (err) { /* storage blocked */ }
+    return asked;
+  }
+  let kept = '';
+  try { kept = webAddress(window.localStorage.getItem('orbit-match-jumpgate')); } catch (err) { kept = ''; }
+  return kept || starMapHref(cfg);
+}
+
 export function applyShell(doc) {
   const root = doc || document;
   return fetch(new URL('../config.json', import.meta.url))
@@ -15,7 +40,7 @@ export function applyShell(doc) {
     })
     .then(function (cfg) {
       const star = root.getElementById('star-map');
-      const href = starMapHref(cfg);
+      const href = peerPage(window.location.search, cfg);
       if (star && href) star.href = href;
       const setting = root.getElementById('setting');
       if (setting && cfg.setting && cfg.setting.lore) setting.href = cfg.setting.lore;

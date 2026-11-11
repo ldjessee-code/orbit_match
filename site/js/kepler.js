@@ -199,13 +199,22 @@ export function fusionMatched(depFn, tgtFn, t0Days, acc, budget, S) {
     const ends = stateAt(T);
     return burnCoastBurn(r0, v0, ends[0], ends[1], T, tbFor(T)).amax;
   };
+  // The thrust a trip needs does not fall steadily with its length, so scan
+  // lengths upward for the first one the drive allows, then refine. No length
+  // up to the limit works: the trip fails, and says so.
+  const LIMIT = 2000 * Math.pow(1.5, 40);
+  const STEP = 1.005;
   let lo = 1000;
-  let hi = 2000;
-  let guard = 0;
-  while (need(hi) > acc && guard < 40) {
-    hi *= 1.5;
-    guard += 1;
+  let hi = null;
+  for (let T = 1000; T <= LIMIT; T *= STEP) {
+    if (need(T) <= acc) {
+      hi = T;
+      break;
+    }
+    lo = T;
   }
+  if (hi == null) return { ok: false, days: null, T: null };
+  if (hi === 1000) lo = hi / STEP;
   for (let i = 0; i < 80; i++) {
     const mid = (lo + hi) / 2;
     if (need(mid) > acc) lo = mid;
@@ -233,6 +242,7 @@ export function fusionMatched(depFn, tgtFn, t0Days, acc, budget, S) {
     return [p[0] / S, p[1] / S];
   };
   return {
+    ok: true,
     T: T,
     days: T / DAY_S,
     tb: tb,

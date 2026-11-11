@@ -15,7 +15,39 @@ function xml(value) {
   return String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// A color from a file goes into an attribute as is, so accept only color
+// syntax: #hex, a CSS name, or rgb()/hsl() with plain numbers.
+const COLOR = /^(#[0-9a-f]{3,8}|[a-z]+|(rgb|rgba|hsl|hsla)\(\s*[-\d.%\s,/]+\))$/i;
+
+export function safeColor(value) {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  return COLOR.test(text) ? text : null;
+}
+
+// Theme and style values also go into attributes. Drop any string that could
+// leave its attribute, so the renderer's own fallback is used instead.
+const ATTR_SAFE = /^[-#\w\s.,()%/]*$/;
+
+function safeSettings(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value || {};
+  const out = {};
+  Object.keys(value).forEach(function (key) {
+    const item = value[key];
+    if (typeof item === 'string') {
+      if (ATTR_SAFE.test(item)) out[key] = item;
+    } else if (item && typeof item === 'object' && !Array.isArray(item)) {
+      out[key] = safeSettings(item);
+    } else {
+      out[key] = item;
+    }
+  });
+  return out;
 }
 
 function auText(value) {
@@ -129,7 +161,8 @@ function diskRadius(body) {
 
 function fillFor(body, theme) {
   const display = body.display || {};
-  if (display.color) return display.color;
+  const own = safeColor(display.color);
+  if (own) return own;
   if (body.kind === 'belt') return theme.belt || '#d8c9a3';
   if (body.kind === 'moon') return theme.moon || theme.planet || '#d9d3c7';
   if (body.kind === 'structure') return theme.structure || theme.accent || '#8fd0ff';
@@ -147,7 +180,9 @@ function labelReach(item) {
   return item.r;
 }
 
-export function renderSvg(system, view, theme, style, options) {
+export function renderSvg(system, view, rawTheme, rawStyle, options) {
+  const theme = safeSettings(rawTheme);
+  const style = safeSettings(rawStyle);
   const frame = options && options.frame && options.frame !== 'system' ? options.frame : 'system';
   const focus = frame === 'system' ? null : byId(system, frame);
   if (focus) return renderClose(system, view, theme, style, focus);
@@ -422,7 +457,7 @@ function belts(parts, system, place, style) {
     const outer = body.orbit.a_outer_au;
     if (!(inner > 0) || !(outer > inner)) return;
     const count = outer > 5 ? 480 : 200;
-    const color = (body.display && body.display.color) || style.belt || style.muted;
+    const color = safeColor(body.display && body.display.color) || style.belt || style.muted;
     for (let i = 0; i < count; i++) {
       // Three uniform draws peak in the middle of the belt. The edges stay thin.
       const u = (hash(body.id + ':u:' + i) + hash(body.id + ':v:' + i) + hash(body.id + ':w:' + i)) / 3;

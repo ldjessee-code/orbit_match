@@ -17,12 +17,27 @@ const types = {
 
 const server = http.createServer(function (req, res) {
   const url = new URL(req.url || '/', 'http://127.0.0.1');
-  let rel = decodeURIComponent(url.pathname);
+  let rel;
+  try {
+    rel = decodeURIComponent(url.pathname);
+  } catch (err) {
+    // A malformed escape such as %E0%A4%A. Refuse it; do not exit.
+    res.writeHead(400);
+    res.end('bad request');
+    return;
+  }
   if (rel.endsWith('/')) rel += 'index.html';
   const file = path.normalize(path.join(root, rel));
   if (file !== root && !file.startsWith(root + path.sep)) {
     res.writeHead(403);
     res.end('no');
+    return;
+  }
+  // A folder without its trailing slash goes to the slash form, as GitHub
+  // Pages does, so relative links on that page still resolve.
+  if (!rel.endsWith('index.html') && fs.existsSync(file) && fs.statSync(file).isDirectory()) {
+    res.writeHead(301, { location: url.pathname + '/' + url.search });
+    res.end();
     return;
   }
   fs.readFile(file, function (err, buf) {

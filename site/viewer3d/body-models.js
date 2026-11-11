@@ -60,14 +60,19 @@ export function jumpgateRingBodyLabel(name, trueScale) {
   return base + ' (not to scale)';
 }
 
+// "ring" as a word or a capitalized part of a name: SM_planet_ring,
+// Jumpgate_Ring_Root, CueRing. Not inside another word, as in SM_spring_tree.
 export function isGlbRingNode(name) {
-  return /ring/i.test(String(name == null ? '' : name));
+  return /(^|[^a-zA-Z])[Rr]ing|Ring/.test(String(name == null ? '' : name));
 }
 
+// A model is a path inside the site. An address with a scheme or a leading
+// // is refused, so a shared file cannot make the viewer call a server.
 function cleanModelPath(value) {
   if (typeof value !== 'string') return null;
   const text = value.trim();
   if (!text || text.indexOf('..') >= 0 || text.indexOf('\\') >= 0 || text.indexOf('\n') >= 0) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(text) || text.indexOf('//') === 0) return null;
   if (!/\.glb$/i.test(text)) return null;
   return text.replace(/^\//, '');
 }
@@ -82,9 +87,20 @@ function modelFromSystem(id, system) {
   return undefined;
 }
 
+// The built-in table is the model pack for one system. It applies to that
+// system, or when no system is given. Any other system names its own models.
+export const BODY_MODEL_PACK_HOST = 'tau Cet';
+
+function packApplies(system) {
+  if (!system || typeof system !== 'object') return true;
+  const star = system.star && typeof system.star === 'object' ? system.star : {};
+  return star.hostname === BODY_MODEL_PACK_HOST;
+}
+
 export function modelFileForBody(id, system) {
   const fromData = modelFromSystem(id, system);
   if (fromData !== undefined) return fromData;
+  if (!packApplies(system)) return null;
   const file = BODY_MODEL_FILE[id];
   if (!file) return null;
   return 'models/' + file;
@@ -165,10 +181,20 @@ function layerNodeName(layer) {
   return layer.node == null ? '' : layer.node;
 }
 
+// Two bodies may both have a "clouds" layer. A key used once is its own
+// state key. A key used again is keyed by its node too, so each body keeps
+// its own switch and default.
+export function layerStateKey(layer, layers) {
+  const list = layerCatalog(layers);
+  const shared = list.filter(function (item) { return item && item.key === layer.key; }).length > 1;
+  return shared ? layer.key + ':' + layerNodeName(layer) : layer.key;
+}
+
 export function defaultLayerState(layers) {
   const state = {};
-  layerCatalog(layers).forEach(function (layer) {
-    state[layer.key] = layerDefault(layer);
+  const list = layerCatalog(layers);
+  list.forEach(function (layer) {
+    state[layerStateKey(layer, list)] = layerDefault(layer);
   });
   return state;
 }
@@ -197,7 +223,8 @@ export function layerVisibleForNode(nodeName, state, layers) {
   for (let i = 0; i < list.length; i++) {
     const layer = list[i];
     if (layerNodeName(layer) !== nodeName) continue;
-    if (state && typeof state[layer.key] === 'boolean') return state[layer.key];
+    const key = layerStateKey(layer, list);
+    if (state && typeof state[key] === 'boolean') return state[key];
     return layerDefault(layer);
   }
   return null;

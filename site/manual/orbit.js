@@ -64,6 +64,8 @@
       if (rows[i].length === 1 && rows[i][0] === "") continue;
       var obj = {};
       for (var cix = 0; cix < headers.length; cix++) obj[headers[cix]] = rows[i][cix] || "";
+      // Some tables name the system in sy_name only.
+      if (!obj.hostname && obj.sy_name) obj.hostname = obj.sy_name;
       if (obj.hostname) out.push(obj);
     }
     return out;
@@ -91,7 +93,8 @@
 
   function starColor(spectype, teff) {
     var s = String(spectype || "").toUpperCase();
-    var letter = (s.match(/[OBAFGKMLTY]/) || [""])[0];
+    // The class is the first letter of the type. "unknown" or "TBD" is no class.
+    var letter = (s.match(/^\s*(?:SD)?([OBAFGKMLTY])(?=[\d.\s:IV+-]|$)/) || ["", ""])[1];
     if (!letter && teff) {
       if (teff >= 30000) letter = "O";
       else if (teff >= 10000) letter = "B";
@@ -112,9 +115,12 @@
     return "#8fd0a8";
   }
 
+  // A period with no stored unit is in days, as a moon card shows it. A planet
+  // card passes its own unit.
   function convertPeriod(value, fromUnit, toUnit) {
     var n = num(value);
-    if (n == null || !fromUnit || fromUnit === toUnit) return value == null ? "" : String(value);
+    if (!fromUnit) fromUnit = "days";
+    if (n == null || fromUnit === toUnit) return value == null ? "" : String(value);
     var years = fromUnit === "days" ? n / YEAR_DAYS : n;
     var out = toUnit === "days" ? years * YEAR_DAYS : years;
     if (!Number.isFinite(out)) return "";
@@ -126,8 +132,13 @@
     if (P == null || P < 0) return null;
     var o2 = num(o2Percent);
     var co2 = num(co2Percent);
-    if (o2 == null) o2 = 0;
+    if (o2 == null) {
+      return { percent: null, aid: "", lines: ["Enter the oxygen percent to see whether people can breathe this."] };
+    }
     if (co2 == null) co2 = 0;
+    if (o2 < 0 || co2 < 0 || o2 + co2 > 100) {
+      return { percent: null, aid: "", lines: ["Oxygen and carbon dioxide add up to more than 100% or below 0%. That mix is not possible."] };
+    }
     var fO2 = o2 / 100;
     var fCO2 = co2 / 100;
     var fN2 = Math.max(0, 1 - fO2 - fCO2);

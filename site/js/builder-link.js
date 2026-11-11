@@ -188,7 +188,15 @@ export function manualHeaderFromSystem(system) {
   };
   STAR_NUMBER.forEach(function (pair) { header[pair[0]] = text(star[pair[1]]); });
   CARD_TEXT.forEach(function (pair) { header[pair[0]] = card[pair[1]] || ''; });
+  CARD_LISTS.forEach(function (pair) { header[pair[0]] = listText(card[pair[1]]); });
   return header;
+}
+
+// Card lists from the star map: tags, imports, and exports.
+const CARD_LISTS = [['tags', 'tags'], ['imports', 'imports'], ['exports', 'exports']];
+
+function splitList(value) {
+  return value ? String(value).split(',').map(function (part) { return part.trim(); }).filter(Boolean) : [];
 }
 
 // A number typed in the form. Blank is null. Anything else that is not a
@@ -236,8 +244,11 @@ function headerRecord(h) {
   });
   if (changed('port')) card().port = h.port ? String(h.port) : null;
   if (changed('services')) {
-    card().services = h.services ? String(h.services).split(',').map(function (part) { return part.trim(); }).filter(Boolean) : [];
+    card().services = splitList(h.services);
   }
+  CARD_LISTS.forEach(function (pair) {
+    if (changed(pair[0])) card()[pair[1]] = splitList(h[pair[0]]);
+  });
   if (changed('arrivals')) {
     const before = Array.isArray(out.arrivals) ? out.arrivals : [];
     out.arrivals = (h.arrivals || []).map(function (host) {
@@ -263,7 +274,11 @@ function headerRecord(h) {
 }
 
 // Keys the form adds to a body. They are written into `orbit`, or dropped.
-const FORM_ONLY = ['au', 'period', 'unit', 'distanceKm', 'position_angle_deg', 'perihelion_longitude_deg', 'moons', 'generated', 'angle_error'];
+const FORM_ONLY = ['au', 'period', 'unit', 'distanceKm', 'position_angle_deg', 'perihelion_longitude_deg', 'moons', 'generated', 'angle_error',
+  'e', 'a_inner_au', 'a_outer_au', 'mass_earth', 'radius_km', 'gravity_derived'];
+// Form fields written into `orbit` or `physical` under the same name.
+const ORBIT_FIELDS = [['e', 'eccentricity'], ['a_inner_au', 'inner edge (AU)'], ['a_outer_au', 'outer edge (AU)']];
+const PHYSICAL_FIELDS = [['mass_earth', 'mass (Earth)'], ['radius_km', 'radius (km)']];
 // Free-text facts the form offers. A blank one is not written.
 const FORM_FACTS = ['gravity', 'atmosphere', 'water', 'temperature', 'day', 'population', 'government', 'tech', 'concept', 'pressure', 'o2', 'co2'];
 
@@ -279,6 +294,8 @@ function exportBody(body, parentId, list) {
   const name = (body && (body.name || body.id)) || 'A body';
   const out = copyJson(body) || {};
   FORM_ONLY.forEach(function (key) { delete out[key]; });
+  // Gravity the form showed from the file's surface_g is not a new fact.
+  if (body.gravity_derived && out.gravity === body.gravity_derived) delete out.gravity;
   FORM_FACTS.forEach(function (key) {
     if (out[key] === '' || out[key] == null) delete out[key];
   });
@@ -287,11 +304,25 @@ function exportBody(body, parentId, list) {
   out.orbit = orbit;
   // What the form would show for the stored orbit. A field that still shows
   // that was not edited, so the stored value is kept exactly.
-  const was = manualBodyFromSystem({ orbit: isPlainObject(body.orbit) ? body.orbit : {} });
+  const was = manualCardFromSystem({
+    orbit: isPlainObject(body.orbit) ? body.orbit : {},
+    physical: isPlainObject(body.physical) ? body.physical : {}
+  });
   if (text(body.au).trim() !== text(was.au)) setOrDelete(orbit, 'a_au', formNumber(body.au, name + ': distance (AU)'));
   if (text(body.distanceKm).trim() !== text(was.distanceKm)) setOrDelete(orbit, 'a_km', formNumber(body.distanceKm, name + ': distance (km)'));
-  const unit = body.unit || 'years';
-  const wasUnit = was.unit || 'years';
+  ORBIT_FIELDS.forEach(function (pair) {
+    if (text(body[pair[0]]).trim() !== text(was[pair[0]])) setOrDelete(orbit, pair[0], formNumber(body[pair[0]], name + ': ' + pair[1]));
+  });
+  PHYSICAL_FIELDS.forEach(function (pair) {
+    if (text(body[pair[0]]).trim() === text(was[pair[0]])) return;
+    const physical = isPlainObject(out.physical) ? out.physical : {};
+    setOrDelete(physical, pair[0], formNumber(body[pair[0]], name + ': ' + pair[1]));
+    if (Object.keys(physical).length || isPlainObject(out.physical)) out.physical = physical;
+  });
+  // A period with no unit is in years on a planet card and in days on a moon.
+  const moonLike = parentId != null || (body.parent != null && body.parent !== '') || body.kind === 'moon';
+  const unit = body.unit || (moonLike ? 'days' : 'years');
+  const wasUnit = was.unit || (moonLike ? 'days' : 'years');
   if (text(body.period).trim() !== text(was.period) || (text(body.period).trim() !== '' && unit !== wasUnit)) {
     setOrDelete(orbit, 'period_days', periodDays(body.period, unit, name + ': period'));
   }
@@ -319,17 +350,44 @@ export function systemRecordFromManual(header, bodies) {
   return out;
 }
 
+// A body as the builder's card shows it, including the period of a moon or a
+// station around its parent.
+export function manualCardFromSystem(body) {
+  return mapBody(body, true);
+}
+
+// The planet view of a body: a period shows only for a body that orbits the
+// star. The builder's cards use manualCardFromSystem.
 export function manualBodyFromSystem(body) {
+  return mapBody(body, false);
+}
+
+function mapBody(body, parentPeriod) {
   const source = body && typeof body === 'object' ? body : {};
   const next = Object.assign({}, source);
   const orbit = source.orbit || {};
-  const heliocentric = typeof orbit.a_au === 'number' && Number.isFinite(orbit.a_au);
-  if ((next.au == null || next.au === '') && heliocentric) {
+  const physical = isPlainObject(source.physical) ? source.physical : {};
+  const blank = function (key) { return next[key] == null || next[key] === ''; };
+  const isNum = function (value) { return typeof value === 'number' && Number.isFinite(value); };
+  const heliocentric = isNum(orbit.a_au);
+  if (blank('au') && heliocentric) {
     next.au = String(orbit.a_au);
   }
-  if (heliocentric && (next.period == null || next.period === '') && typeof orbit.period_days === 'number' && Number.isFinite(orbit.period_days)) {
+  // A moon or a station shows its distance from its parent in km.
+  if (blank('distanceKm') && isNum(orbit.a_km)) next.distanceKm = String(orbit.a_km);
+  if (blank('period') && isNum(orbit.period_days) && (heliocentric || parentPeriod)) {
     next.period = String(orbit.period_days);
     if (!next.unit) next.unit = 'days';
+  }
+  ORBIT_FIELDS.forEach(function (pair) {
+    if (blank(pair[0]) && isNum(orbit[pair[0]])) next[pair[0]] = String(orbit[pair[0]]);
+  });
+  PHYSICAL_FIELDS.forEach(function (pair) {
+    if (blank(pair[0]) && isNum(physical[pair[0]])) next[pair[0]] = String(physical[pair[0]]);
+  });
+  if (blank('gravity') && isNum(physical.surface_g)) {
+    next.gravity = String(physical.surface_g) + ' g';
+    next.gravity_derived = next.gravity;
   }
   const posText = angleText(orbit.position_angle_deg);
   const periText = angleText(orbit.perihelion_longitude_deg);
@@ -342,7 +400,7 @@ export function manualBodyFromSystem(body) {
   if (typeof next.position_angle_deg === 'number') next.position_angle_deg = String(next.position_angle_deg);
   if (typeof next.perihelion_longitude_deg === 'number') next.perihelion_longitude_deg = String(next.perihelion_longitude_deg);
   if (Array.isArray(next.moons)) {
-    next.moons = next.moons.map(function (moon) { return manualBodyFromSystem(moon); });
+    next.moons = next.moons.map(function (moon) { return mapBody(moon, parentPeriod); });
   }
   return next;
 }
@@ -357,6 +415,7 @@ if (typeof window !== 'undefined') {
     focusTarget: focusTarget,
     cardLinks: cardLinks,
     manualBodyFromSystem: manualBodyFromSystem,
+    manualCardFromSystem: manualCardFromSystem,
     manualHeaderFromSystem: manualHeaderFromSystem,
     systemRecordFromManual: systemRecordFromManual,
     checkSystem: checkSystem,

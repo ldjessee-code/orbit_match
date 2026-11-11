@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Build a system · Orbit Match</title>
+<link rel="icon" href="../img/true-eyed-jack.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../css/site.css">
 <link rel="stylesheet" href="manual.css">
 <script src="../js/theme.js"></script>
@@ -26,6 +27,8 @@
   </div>
   <nav>
     <a href="../">Home</a>
+    <a href="../viewer/?view=svg">SVG viewer</a>
+    <a href="../viewer3d/?view=3d">3D viewer</a>
     <a id="star-map" href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
     <a href="https://github.com/ldjessee-code/orbit_match/blob/main/INTERCONNECT.md">Interconnect</a>
   </nav>
@@ -115,6 +118,15 @@
         <label class="wide">Services
           <input data-header="services" placeholder="fuel, repair, trade">
         </label>
+        <label class="wide">Tags
+          <input data-header="tags" placeholder="frontier, mining">
+        </label>
+        <label>Imports
+          <input data-header="imports">
+        </label>
+        <label>Exports
+          <input data-header="exports">
+        </label>
         <label>Epoch
           <input data-header="epoch" placeholder="TBD (day 0)">
         </label>
@@ -130,6 +142,7 @@
         <button type="button" id="add-body">Add an orbital object</button>
         <button type="button" id="randomize-all">Randomize all planets</button>
         <button type="button" id="save-system">Save this system</button>
+        <button type="button" id="view-system">View this system</button>
         <button type="button" id="new-system">New system</button>
         <button type="button" id="undo" disabled>Undo</button>
       </div>

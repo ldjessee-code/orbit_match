@@ -48,6 +48,9 @@
       holder: "",
       port: "",
       services: "",
+      tags: "",
+      imports: "",
+      exports: "",
       fuel: "",
       fuel_unit: "",
       arrivals: [],
@@ -116,15 +119,27 @@
     });
   }
 
+  // A file that states its goldilocks zone keeps it while the star facts that
+  // set it are unchanged. Otherwise the zone comes from the luminosity.
+  function fileHz() {
+    var source = state.header.source;
+    var star = source && source.star;
+    if (!star || typeof star.hz_inner_au !== "number" || typeof star.hz_outer_au !== "number") return null;
+    var same = [["lum", "lum_log"], ["teff", "teff_k"], ["rad", "radius_solar"], ["mass", "mass_solar"]].every(function (pair) {
+      return String(state.header[pair[0]] == null ? "" : state.header[pair[0]]) === String(star[pair[1]] == null ? "" : star[pair[1]]);
+    });
+    return same ? { inner: star.hz_inner_au, outer: star.hz_outer_au, file: true } : null;
+  }
+
   function refreshHz() {
-    state.hz = O.goldilocks(headerLum());
+    state.hz = fileHz() || O.goldilocks(headerLum());
   }
 
   function zoneNote() {
     if (!state.hz) return "The goldilocks band appears once the star has a luminosity or a radius and temperature.";
     var a = state.hz.inner.toFixed(2);
     var b = state.hz.outer.toFixed(2);
-    return "Goldilocks zone " + a + "–" + b + " AU, from this star's luminosity. A body sits in the band when its distance is inside that range.";
+    return "Goldilocks zone " + a + "–" + b + " AU, " + (state.hz.file ? "as the file gives it" : "from this star's luminosity") + ". A body sits in the band when its distance is inside that range.";
   }
 
   function paintStar() {
@@ -135,7 +150,7 @@
     var spec = document.getElementById("spec-type");
     if (host) host.textContent = state.header.hostname || "No star yet";
     if (spec) spec.textContent = state.header.spectype || "Spectral type unknown";
-    ["hostname", "setting_name", "spectype", "mass", "lum", "teff", "rad", "x", "y", "z", "planets", "concept", "holder", "port", "services", "fuel", "fuel_unit", "epoch", "reference_label", "reference_deg"].forEach(function (key) {
+    ["hostname", "setting_name", "spectype", "mass", "lum", "teff", "rad", "x", "y", "z", "planets", "concept", "holder", "port", "services", "tags", "imports", "exports", "fuel", "fuel_unit", "epoch", "reference_label", "reference_deg"].forEach(function (key) {
       var input = starCard.querySelector('[data-header="' + key + '"]');
       if (input && document.activeElement !== input) input.value = state.header[key] || "";
     });
@@ -152,6 +167,8 @@
     var index = list.findIndex(function (item) { return item.id === body.id; });
     var zones = O.visualZones(state.rows);
     var notes = O.warningsFor(body, list[index - 1], list[index + 1], zones[body.id], state.hz, mass());
+    var kepler = keplerNote(body);
+    if (kepler) notes.push(kepler);
     var card = document.createElement("article");
     card.className = "body-card";
     card.dataset.body = body.id;
@@ -168,7 +185,8 @@
         field("Orbital period", '<input data-field="period" data-help="period" inputmode="decimal" value="' + esc(body.period) + '">') +
         field("Unit", '<select data-field="unit" data-help="unit"><option value="years"' + (body.unit === "years" ? " selected" : "") + '>Years</option><option value="days"' + (body.unit === "days" ? " selected" : "") + ">Days</option></select>") +
       "</div>" +
-      field("Distance (AU)", '<input data-field="au" inputmode="decimal" value="' + esc(body.au) + '">') +
+      distanceHtml(body) +
+      (body.kind === "belt" ? "" : field("Eccentricity", '<input data-field="e" inputmode="decimal" placeholder="0 is a circle" value="' + esc(body.e) + '">')) +
       '<div class="angle-row">' +
         field("Position at epoch (deg)", '<input data-field="position_angle_deg" inputmode="decimal" value="' + esc(body.position_angle_deg) + '">') +
         '<button type="button" data-act="random-position">Random</button>' +
@@ -177,9 +195,13 @@
         field("Longitude of perihelion (deg)", '<input data-field="perihelion_longitude_deg" inputmode="decimal" value="' + esc(body.perihelion_longitude_deg) + '">') +
         '<button type="button" data-act="random-perihelion">Random</button>' +
       "</div>" +
-      (body.angle_error ? '<p class="warn">' + esc(body.angle_error) + "</p>" : "") +
+      (body.angle_error ? '<p class="warn" data-angle-error>' + esc(body.angle_error) + "</p>" : "") +
       (notes.length ? '<p class="warn">' + notes.map(esc).join(" ") + "</p>" : "") +
       "<details><summary>World facts</summary>" +
+        '<div class="pair">' +
+          field("Mass (Earth = 1)", '<input data-field="mass_earth" inputmode="decimal" value="' + esc(body.mass_earth) + '">') +
+          field("Radius (km)", '<input data-field="radius_km" inputmode="decimal" value="' + esc(body.radius_km) + '">') +
+        "</div>" +
         field("Gravity", '<input data-field="gravity" value="' + esc(body.gravity) + '">') +
         field("Atmosphere", '<input data-field="atmosphere" value="' + esc(body.atmosphere) + '">') +
         field("Water", '<input data-field="water" value="' + esc(body.water) + '">') +
@@ -198,9 +220,43 @@
     return card;
   }
 
+  // A belt has two edges. A body with a parent sits a distance in km from it.
+  // Any other body sits a distance in AU from the star.
+  function distanceHtml(body) {
+    if (body.kind === "belt") {
+      return '<div class="pair">' +
+        field("Inner edge (AU)", '<input data-field="a_inner_au" inputmode="decimal" value="' + esc(body.a_inner_au) + '">') +
+        field("Outer edge (AU)", '<input data-field="a_outer_au" inputmode="decimal" value="' + esc(body.a_outer_au) + '">') +
+        "</div>";
+    }
+    if (body.parent) {
+      return field("Distance from " + esc(parentName(body.parent)) + " (km)", '<input data-field="distanceKm" inputmode="decimal" value="' + esc(body.distanceKm) + '">');
+    }
+    return field("Distance (AU)", '<input data-field="au" inputmode="decimal" value="' + esc(body.au) + '">');
+  }
+
+  function parentName(id) {
+    var found = bodies().find(function (item) { return item.id === id; });
+    return (found && found.name) || id;
+  }
+
+  // Period and distance agree for the star's mass by Kepler's third law. When
+  // the mass changes, a card says so instead of keeping two numbers that no
+  // longer fit.
+  function keplerNote(body) {
+    if (body.parent || body.kind === "belt") return "";
+    var years = O.periodYears(body);
+    var au = O.num(body.au);
+    if (years == null || au == null || au <= 0) return "";
+    var expected = O.auToPeriodYears(au, mass());
+    if (!expected || Math.abs(years - expected) / expected < 0.02) return "";
+    return "This period and distance do not agree for a star of " + mass() + " solar masses. Change one of them, or the star mass.";
+  }
+
   function airHtml(body) {
     var advice = O.airAdvice(body.pressure, body.o2, body.co2);
     if (!advice) return "";
+    if (advice.percent == null) return '<p class="air-note">' + esc(advice.lines.join(" ")) + "</p>";
     var extra = advice.lines.length ? " " + advice.lines.join(" ") : "";
     return '<p class="air-note">Oxygen is about ' + advice.percent + '% of a normal breath. Lightest gear: ' + esc(advice.aid) + "." + esc(extra) + "</p>";
   }
@@ -230,7 +286,8 @@
   }
 
   function moonHtml(body) {
-    if (body.kind === "moon") return "";
+    // A moon card shows moons it already holds, so none is hidden.
+    if (body.kind === "moon" && !(body.moons && body.moons.length)) return "";
     var moons = body.moons || [];
     var html = '<div class="moons"><p class="moon-title">Moons</p>';
     moons.forEach(function (moon) {
@@ -271,8 +328,14 @@
     return html;
   }
 
+  // The kinds the viewers draw. A station, gate, or yard is a structure. A
+  // kind from an older file stays in the list, so it is not lost.
+  var KINDS = ["planet", "moon", "asteroid", "belt", "structure"];
+
   function options(kind) {
-    return ["planet", "moon", "asteroid", "belt", "jumpgate", "station", "staryard"].map(function (name) {
+    var list = KINDS.slice();
+    if (kind && list.indexOf(kind) < 0) list.push(kind);
+    return list.map(function (name) {
       return '<option value="' + name + '"' + (name === kind ? " selected" : "") + ">" + name + "</option>";
     }).join("");
   }
@@ -422,7 +485,7 @@
 
   // Star facts that a star list fills. Typed values count as work.
   var STAR_FACTS = ["hostname", "setting_name", "spectype", "mass", "lum", "teff", "rad", "x", "y", "z"];
-  var CARD_FIELDS = ["concept", "holder", "port", "services", "fuel", "fuel_unit", "epoch"];
+  var CARD_FIELDS = ["concept", "holder", "port", "services", "tags", "imports", "exports", "fuel", "fuel_unit", "epoch"];
 
   function starFacts() {
     var out = {};
@@ -495,9 +558,12 @@
     state.header.planets = count == null ? "" : String(Math.round(count));
     search.value = row.hostname || "";
     refreshHz();
-    var n = Math.max(0, Math.min(40, Math.round(count || 0)));
-    var list = [];
-    for (var i = 0; i < n; i++) list.push(blankBody("planet", true));
+    // Published planets fill their cards. The rest of the count stays blank.
+    var list = (row.planets || []).slice(0, 40).map(planetFromRow).sort(function (a, b) {
+      return (O.bodyAu(a, mass()) || Infinity) - (O.bodyAu(b, mass()) || Infinity);
+    });
+    var n = Math.max(list.length, Math.min(40, Math.round(count || 0)));
+    while (list.length < n) list.push(blankBody("planet", true));
     state.rows = O.withZones(list, state.hz, mass());
     state.opened = null;
     state.clean = null;
@@ -584,8 +650,48 @@
     results.hidden = true;
   }
 
+  // NASA tables have one row per planet. A star is listed once, and keeps its
+  // planet rows.
+  function groupStars(rows) {
+    var byHost = {};
+    var out = [];
+    rows.forEach(function (row) {
+      var key = row.hostname;
+      var star = byHost[key];
+      if (!star) {
+        star = Object.assign({}, row);
+        star.planets = [];
+        byHost[key] = star;
+        out.push(star);
+      }
+      if (row.pl_name || O.num(row.pl_orbsmax) != null || O.num(row.pl_orbper) != null) star.planets.push(row);
+    });
+    return out;
+  }
+
+  // One published planet as a card: distance, period, eccentricity, mass,
+  // and radius, from the NASA planet columns.
+  function planetFromRow(row) {
+    var body = blankBody("planet", false);
+    body.name = row.pl_name || "";
+    var au = O.num(row.pl_orbsmax);
+    var days = O.num(row.pl_orbper);
+    var e = O.num(row.pl_orbeccen);
+    var earths = O.num(row.pl_bmasse);
+    var radius = O.num(row.pl_rade);
+    if (au != null && au > 0) body.au = String(au);
+    if (days != null && days > 0) {
+      body.period = String(days);
+      body.unit = "days";
+    }
+    if (e != null && e >= 0 && e < 1) body.e = String(e);
+    if (earths != null && earths > 0) body.mass_earth = String(earths);
+    if (radius != null && radius > 0) body.radius_km = String(Number((radius * 6371.0).toPrecision(5)));
+    return body;
+  }
+
   function loadStars(text, source) {
-    state.stars = O.parseCsv(text);
+    state.stars = groupStars(O.parseCsv(text));
     state.source = source;
     var link = window.OrbitBuilderLink;
     if (state.fromDeepLink || (link && link.parseBuilderHash(location.hash).mode === "load")) return;
@@ -621,6 +727,9 @@
       if (q.get(key)) state.header[key] = q.get(key);
     });
     if (q.getAll("svc").length) state.header.services = q.getAll("svc").join(", ");
+    if (q.getAll("tag").length) state.header.tags = q.getAll("tag").join(", ");
+    if (q.getAll("imp").length) state.header.imports = q.getAll("imp").join(", ");
+    if (q.getAll("exp").length) state.header.exports = q.getAll("exp").join(", ");
     if (q.getAll("from").length) state.header.arrivals = q.getAll("from");
     if (!bodies().length && O.num(state.header.planets)) {
       var n = Math.max(0, Math.min(40, Math.round(O.num(state.header.planets))));
@@ -661,14 +770,16 @@
   }
 
   function syncOrbit(body, source) {
+    // Four significant figures, so a close planet keeps its distance.
+    var figures = function (value) { return String(Number(value.toPrecision(4))); };
     if (source === "period") {
       var au = O.periodToAu(O.periodYears(body), mass());
-      body.au = au == null ? "" : String(Math.round(au * 1000) / 1000);
+      body.au = au == null ? "" : figures(au);
     } else if (source === "au") {
       var years = O.auToPeriodYears(body.au, mass());
       if (years == null) body.period = "";
-      else if (body.unit === "days") body.period = String(Math.round(years * O.YEAR_DAYS * 10) / 10);
-      else body.period = String(Math.round(years * 1000) / 1000);
+      else if (body.unit === "days") body.period = figures(years * O.YEAR_DAYS);
+      else body.period = figures(years);
     }
   }
 
@@ -722,7 +833,8 @@
       return;
     }
     if (input.dataset.field === "unit") {
-      body.period = O.convertPeriod(body.period, body.unit, input.value);
+      // A planet card with no stored unit shows Years.
+      body.period = O.convertPeriod(body.period, body.unit || "years", input.value);
       body.unit = input.value;
       renderStack({ body: body.id, field: "period" });
       saveLocal();
@@ -746,6 +858,12 @@
     body[input.dataset.field] = input.value;
     if (input.dataset.field === "generated") return;
     body.generated = false;
+    if (input.dataset.field === "kind") {
+      // The card's fields follow its kind, and moons it holds stay shown.
+      renderStack();
+      saveLocal();
+      return;
+    }
     if (input.dataset.field === "pressure" || input.dataset.field === "o2" || input.dataset.field === "co2") {
       refreshAir(card, body);
       saveLocal();
@@ -1073,14 +1191,17 @@
     catch (err) { throw new Error("That file is not valid JSON."); }
     if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("That file is not a system JSON.");
     var link = window.OrbitBuilderLink;
-    if (!link || !link.checkSystem || !link.manualBodyFromSystem) throw new Error("The system link did not load.");
+    // Cards show a moon's own period. An older link script has only
+    // manualBodyFromSystem.
+    var card = link && (link.manualCardFromSystem || link.manualBodyFromSystem);
+    if (!link || !link.checkSystem || !card) throw new Error("The system link did not load.");
     link.checkSystem(data);
     var header = Object.assign(blankHeader(), link.manualHeaderFromSystem(data));
     var list = (data.bodies || []).map(function (body) {
-      var next = link.manualBodyFromSystem(body);
+      var next = card(body);
       next.id = next.id || uid();
       next.moons = (next.moons || []).map(function (moon) {
-        var mapped = link.manualBodyFromSystem(moon);
+        var mapped = card(moon);
         mapped.id = mapped.id || uid();
         return mapped;
       });
@@ -1491,6 +1612,47 @@
     });
   }
 
+  // The viewers read the system being edited from this key, so it can be seen
+  // without saving a file first.
+  var VIEW_KEY = "orbit-match-view-system";
+
+  function viewSystem() {
+    var record;
+    try { record = systemRecord(); }
+    catch (err) {
+      setStatus((err.message || "The system has a field that is not a number.") + " Fix it to view the system.");
+      return;
+    }
+    try { localStorage.setItem(VIEW_KEY, JSON.stringify(record)); }
+    catch (err) {
+      setStatus("This browser did not keep the system for the viewer (storage is full or blocked). Save it to a file and open that in the viewer.");
+      return;
+    }
+    window.open("../viewer/?view=svg&source=builder", "_blank", "noopener");
+    setStatus("Opened " + (state.header.hostname || "the system") + " in the viewer.");
+  }
+
+  // The star map link follows ?jumpgate= and the address this browser
+  // remembered, as the viewers do.
+  function setPeerLink(cfg) {
+    var star = document.getElementById("star-map");
+    if (!star) return;
+    var web = function (value) {
+      try {
+        var url = new URL(String(value || ""));
+        return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+      } catch (err) { return ""; }
+    };
+    var asked = web(new URLSearchParams(location.search).get("jumpgate"));
+    var kept = "";
+    try {
+      if (asked) window.localStorage.setItem("orbit-match-jumpgate", asked);
+      else kept = web(window.localStorage.getItem("orbit-match-jumpgate"));
+    } catch (err) { kept = ""; }
+    var href = asked || kept || (cfg && cfg.pages && cfg.pages.starroute_map) || (cfg && cfg.other_page) || "";
+    if (href) star.href = href;
+  }
+
   function wide() {
     return window.matchMedia("(min-width: 900px)").matches;
   }
@@ -1505,6 +1667,17 @@
   document.getElementById("randomize-all").addEventListener("click", randomizeAll);
   document.getElementById("new-system").addEventListener("click", newSystem);
   if (undoButton) undoButton.addEventListener("click", undo);
+  var viewButton = document.getElementById("view-system");
+  if (viewButton) viewButton.addEventListener("click", viewSystem);
+  // A new deep link in the address loads that system, after the same
+  // question as any other open.
+  window.addEventListener("hashchange", function () {
+    var link = window.OrbitBuilderLink;
+    if (!link || link.parseBuilderHash(location.hash).mode !== "load") return;
+    guardReplace("Opening the linked system").then(function (go) {
+      if (go) bootDeepLink();
+    });
+  });
   search.addEventListener("focus", showResults);
   search.addEventListener("input", showResults);
   document.addEventListener("click", function (event) {
@@ -1561,7 +1734,7 @@
 
   fetch("../config.json")
     .then(function (response) { if (!response.ok) throw new Error(String(response.status)); return response.json(); })
-    .then(function (cfg) { return fetch(cfg.star_list); })
+    .then(function (cfg) { setPeerLink(cfg); return fetch(cfg.star_list); })
     .then(function (response) { if (!response.ok) throw new Error(String(response.status)); return response.text(); })
     .then(function (text) {
       if (state.stars.length) return;

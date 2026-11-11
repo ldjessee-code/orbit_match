@@ -62,7 +62,7 @@ function builderOpen(link, data) {
     fuel_unit: card.fuel_unit || '',
     arrivals: (data.arrivals || []).map(function (item) { return item.from_hostname; })
   }, link.manualHeaderFromSystem(data));
-  const bodies = (data.bodies || []).map(function (body) { return link.manualBodyFromSystem(body); });
+  const bodies = (data.bodies || []).map(function (body) { return link.manualCardFromSystem(body); });
   return { header: header, bodies: bodies };
 }
 

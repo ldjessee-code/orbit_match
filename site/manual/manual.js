@@ -640,6 +640,9 @@
   function readHeader(event) {
     var input = event.target.closest("[data-header]");
     if (!input) return;
+    // A change event after an input event carries the same value. One edit is
+    // handled once.
+    if (event.type === "change" && String(state.header[input.dataset.header] == null ? "" : state.header[input.dataset.header]) === input.value) return;
     state.header[input.dataset.header] = input.value;
     if (input.dataset.header === "planets") {
       var n = O.num(input.value);
@@ -675,9 +678,17 @@
     if (!input || !card) return;
     var body = bodies().find(function (item) { return item.id === card.dataset.body; });
     if (!body) return;
+    var moonEl = input.closest("[data-moon]");
+    // A change event after an input event carries the same value. One edit is
+    // handled once.
+    if (event.type === "change") {
+      var owner = body;
+      if (moonEl) owner = (body.moons || []).find(function (item) { return item.id === moonEl.dataset.moon; }) || null;
+      var key = input.dataset.moonField || input.dataset.field;
+      if (owner && String(owner[key] == null ? "" : owner[key]) === input.value) return;
+    }
     // Any change, including a moon or an angle, makes the card the user's work.
     body.generated = false;
-    var moonEl = input.closest("[data-moon]");
     if (moonEl) {
       var moon = (body.moons || []).find(function (item) { return item.id === moonEl.dataset.moon; });
       if (!moon) return;
@@ -1007,7 +1018,7 @@
       return;
     }
     var text = JSON.stringify(record, null, 2);
-    var name = (state.header.hostname || "system").replace(/[^\w.-]+/g, "_") + ".system.json";
+    var name = fileStem(state.header.hostname) + ".system.json";
     var write = function (backupName) {
       download(text, name);
       state.opened = { name: name, text: text };
@@ -1121,13 +1132,39 @@
     return String(name || "system").replace(/\.system\.json$/i, "").replace(/\.json$/i, "");
   }
 
+  // Greek letters common in star names, spelled out for a file name.
+  var GREEK = {
+    "α": "alf", "β": "bet", "γ": "gam", "δ": "del", "ε": "eps", "ζ": "zet", "η": "eta", "θ": "tet",
+    "ι": "iot", "κ": "kap", "λ": "lam", "μ": "mu", "ν": "nu", "ξ": "ksi", "ο": "omi", "π": "pi",
+    "ρ": "rho", "σ": "sig", "ς": "sig", "τ": "tau", "υ": "ups", "φ": "phi", "χ": "chi", "ψ": "psi", "ω": "ome"
+  };
+
+  // A file name the viewers accept (safeSystemFile): ASCII letters, digits,
+  // dot, dash, and underscore, starting with a letter or digit.
+  function fileStem(name) {
+    var text = String(name || "").replace(/[α-ωΑ-Ω]/g, function (c) {
+      var spelled = GREEK[c.toLowerCase()];
+      return spelled ? spelled + " " : c;
+    });
+    if (text.normalize) text = text.normalize("NFKD").replace(/[̀-ͯ]/g, "");
+    text = text.replace(/[^A-Za-z0-9.-]+/g, "_").replace(/_+/g, "_").replace(/^[^A-Za-z0-9]+/, "").replace(/[_.-]+$/, "");
+    return text || "system";
+  }
+
+  // The link is in the page when it is clicked, and the address is kept a
+  // while after, so every browser can start the download.
   function download(text, name) {
     var blob = new Blob([text], { type: "application/json" });
     var link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = name;
+    link.hidden = true;
+    document.body.appendChild(link);
     link.click();
-    setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+    setTimeout(function () {
+      link.remove();
+      URL.revokeObjectURL(link.href);
+    }, 1000);
   }
 
   // The file exactly as it was opened, under a dated name.
@@ -1143,7 +1180,7 @@
     var text;
     try { text = JSON.stringify(systemRecord(), null, 2); }
     catch (err) { text = JSON.stringify({ unsaved_builder_draft: JSON.parse(snapshot()) }, null, 2); }
-    var name = baseName(state.header.hostname || "system").replace(/[^\w.-]+/g, "_") + ".backup-" + stamp() + ".system.json";
+    var name = fileStem(baseName(state.header.hostname || "system")) + ".backup-" + stamp() + ".system.json";
     download(text, name);
     return name;
   }

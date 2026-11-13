@@ -1,7 +1,15 @@
 import { loadView } from '../js/schema.js';
 import { cardLinks, VIEWER_SYSTEM_ID } from '../js/builder-link.js';
 import { applyShell } from '../js/shell.js';
-import { isHandoff, isLoreSystem, resolveSystem, safeSystemFile } from '../js/system-source.js';
+import {
+  fetchJson,
+  fillSelect,
+  keepSystemInLinks,
+  loadFailText,
+  loadRequestedSystem,
+  systemFromText,
+  tripChoices
+} from '../js/viewer-common.js';
 import {
   collectBrowserSignals,
   decideViewer,
@@ -147,13 +155,6 @@ function webglContext(surface) {
   }
 }
 
-function fetchJson(url) {
-  return fetch(url).then(function (response) {
-    if (!response.ok) throw new Error(url + ' ' + response.status);
-    return response.json();
-  });
-}
-
 function modeLabel(mode) {
   return mode === 'linear' ? 'True AU' : 'Schematic';
 }
@@ -164,9 +165,8 @@ function viewNow() {
   next.distance_mode = session.distance_mode;
   next.elevation_deg = session.elevation_deg;
   next.azimuth_deg = session.azimuth_deg;
-  const search = typeof location === 'undefined' ? '' : location.search;
   const state = playback && playback.viewerState ? playback.viewerState() : readViewerState();
-  return viewAtClock(next, loadedSystem, state, systemIdFromSearch(search));
+  return viewAtClock(next, loadedSystem, state, currentClockId());
 }
 
 function stageSize() {
@@ -869,25 +869,88 @@ function bindLoreSettings(THREE, root) {
   });
 }
 
-async function loadRequestedSystem() {
-  const params = new URLSearchParams(location.search);
-  const requested = params.get('system');
-  let loreName = 'tau-ceti.system.json';
-  if (requested) {
-    const withSuffix = /\.system\.json$/i.test(requested) ? requested : requested + '.system.json';
-    const safe = safeSystemFile(withSuffix);
-    if (!safe) throw new Error('system name is not allowed');
-    loreName = safe;
-  }
-  const handoffName = loreName.replace(/\.system\.json$/i, '.handoff.json');
-  let lore = null;
-  let handoff = null;
-  try { lore = await fetchJson('../data/' + loreName); } catch (err) { lore = null; }
-  try { handoff = await fetchJson('../data/' + handoffName); } catch (err) { handoff = null; }
-  if (lore && !isLoreSystem(lore)) lore = null;
-  if (handoff && !isHandoff(handoff)) handoff = null;
-  if (!lore && !handoff) throw new Error('system file missing');
-  return resolveSystem({ lore: lore, handoff: handoff });
+function storageOrNull() {
+  try { return typeof localStorage === 'undefined' ? null : localStorage; } catch (err) { return null; }
+}
+
+// A file the visitor opened keeps its own clock, apart from ?system=.
+let clockId = null;
+
+function currentClockId() {
+  if (clockId) return clockId;
+  const search = typeof location === 'undefined' ? '' : location.search;
+  return systemIdFromSearch(search);
+}
+
+function paintTrip() {
+  if (!loadedSystem || !loadedView) return;
+  const rows = tripChoices(loadedSystem);
+  const spec = loadedView.transfer || {};
+  fillSelect(document, document.getElementById('trip-from'), rows, spec.from, 'No trip');
+  fillSelect(document, document.getElementById('trip-to'), rows, spec.to, 'No trip');
+}
+
+function bindPageControls(THREE, root) {
+  const from = document.getElementById('trip-from');
+  const to = document.getElementById('trip-to');
+  const chooseTrip = function () {
+    if (!loadedView) return;
+    const a = from ? from.value : '';
+    const b = to ? to.value : '';
+    loadedView = Object.assign({}, loadedView, {
+      transfer: a && b ? Object.assign({}, loadedView.transfer || {}, { from: a, to: b }) : null
+    });
+    rebuild(THREE, root, false);
+    paintCards();
+  };
+  if (from) from.addEventListener('change', chooseTrip);
+  if (to) to.addEventListener('change', chooseTrip);
+  const go = document.getElementById('goto-day-go');
+  const day = document.getElementById('goto-day');
+  if (go && day) go.addEventListener('click', function () {
+    const target = Number(day.value);
+    if (!playback || day.value === '' || !Number.isFinite(target)) return;
+    playback.step(target - playback.elapsed());
+  });
+  const reset = document.getElementById('reset-epoch');
+  if (reset) reset.addEventListener('click', function () {
+    if (playback) playback.step(-playback.elapsed());
+  });
+  const picker = document.getElementById('system-file');
+  const status = document.getElementById('load-status');
+  if (picker) picker.addEventListener('change', function () {
+    const file = picker.files && picker.files[0];
+    picker.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+      try {
+        const system = systemFromText(String(reader.result), file.name);
+        clockId = 'file:' + file.name;
+        loadedSystem = system;
+        loadedView = Object.assign(loadView({ orbit_match_view: 1 }), { theme: themeName });
+        dataLayers = layersFromSystem(loadedSystem);
+        layerState = dataLayers.length ? defaultLayerState(dataLayers) : defaultLayerState();
+        fillBeltControl(loadedSystem);
+        frame = 'system';
+        session = Object.assign(initialSession(loadedView), {
+          elevation_deg: session.elevation_deg,
+          azimuth_deg: session.azimuth_deg
+        });
+        if (playback) playback.setClose(false);
+        paintTrip();
+        rebuild(THREE, root, true);
+        paintCards();
+        if (status) status.textContent = 'Opened ' + file.name + '.';
+      } catch (err) {
+        if (status) status.textContent = loadFailText(err) + ' The picture did not change.';
+      }
+    };
+    reader.onerror = function () {
+      if (status) status.textContent = file.name + ' could not be read. The picture did not change.';
+    };
+    reader.readAsText(file);
+  });
 }
 
 function rebuild(THREE, root, resetCamera) {
@@ -1068,9 +1131,9 @@ function tick() {
 }
 
 async function startViewer(THREE, OrbitControls, gl) {
-  const viewFile = await fetchJson('../data/tau-ceti.view.json');
-  loadedSystem = await loadRequestedSystem();
-  loadedView = loadView(viewFile);
+  const loaded = await loadRequestedSystem(location.search, storageOrNull());
+  loadedSystem = loaded.system;
+  loadedView = loaded.view;
   dataLayers = layersFromSystem(loadedSystem);
   layerState = dataLayers.length ? defaultLayerState(dataLayers) : defaultLayerState();
   fillBeltControl(loadedSystem);
@@ -1177,13 +1240,12 @@ async function startViewer(THREE, OrbitControls, gl) {
         if (!loadedSystem) return;
         rebuild(THREE, root, false);
       },
-      systemId: function () {
-        const search = typeof location === 'undefined' ? '' : location.search;
-        return systemIdFromSearch(search);
-      },
+      systemId: function () { return currentClockId(); },
       isClose: function () { return frame !== 'system'; }
     });
   }
+  bindPageControls(THREE, root);
+  paintTrip();
   const crumbHost = document.getElementById('crumbs');
   if (crumbHost) {
     crumbHost.addEventListener('click', function (event) {
@@ -1316,6 +1378,7 @@ async function boot() {
   }
   bindResourceToggle();
   applyShell(document);
+  keepSystemInLinks(document, location.search);
   stage = document.getElementById('stage');
   canvas = stage ? stage.querySelector('canvas') : null;
   if (!canvas) {
@@ -1347,7 +1410,7 @@ async function boot() {
     await startViewer(THREE, OrbitControls, gl);
   } catch (err) {
     const status = document.getElementById('load-status');
-    if (status) status.textContent = 'The system file did not load. Open this page from the static server.';
+    if (status) status.textContent = loadFailText(err);
   }
 }
 

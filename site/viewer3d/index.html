@@ -45,6 +45,9 @@
       <p id="crumbs">
         <button type="button" id="crumb-system" data-frame="system">System</button>
       </p>
+      <label class="file-btn">Open a system file
+        <input id="system-file" type="file" accept=".json,application/json">
+      </label>
       <span id="zoom-note">Zoom: wheel</span>
       <label>Elevation <input id="elev" type="range" min="15" max="75" value="20"> <span id="elev-readout">20°</span></label>
       <label>Theme
@@ -52,6 +55,12 @@
           <option value="empire">empire</option>
           <option value="mardat">mardat</option>
         </select>
+      </label>
+      <label>Trip from
+        <select id="trip-from" aria-label="Trip from"></select>
+      </label>
+      <label>to
+        <select id="trip-to" aria-label="Trip to"></select>
       </label>
       <button type="button" id="play-reverse" aria-pressed="false">Play reverse</button>
       <button type="button" id="play-pause" aria-pressed="true">Pause</button>
@@ -67,15 +76,18 @@
       <button type="button" id="time-back" data-days="-1">-1 day</button>
       <button type="button" id="time-fwd" data-days="1">+1 day</button>
       <button type="button" id="time-fwd-10" data-days="10">+10 days</button>
+      <label>Go to day <input id="goto-day" type="number" step="any" inputmode="decimal" size="6"></label>
+      <button type="button" id="goto-day-go">Go</button>
+      <button type="button" id="reset-epoch">Back to the epoch</button>
       <button type="button" id="resource-toggle">SVG view</button>
+      <p id="readout" aria-live="polite"></p>
     </div>
     <details id="lore-settings" class="lore-settings">
       <summary>Lore based settings</summary>
       <div id="lore-settings-body"></div>
     </details>
-    <p id="readout" aria-live="polite"></p>
   </div>
-  <p id="load-status"></p>
+  <p id="load-status" aria-live="polite"></p>
   <div id="stage">
     <canvas></canvas>
     <div id="legend"></div>
@@ -88,6 +100,17 @@
     </div>
   </div>
 </main>
+<footer class="site-foot">
+  <div class="foot-left">
+    <a class="tej-brand" href="https://trueeyedjack.com/" target="_blank" rel="noopener noreferrer">
+      <img src="../img/true-eyed-jack.svg" alt="" width="36" height="36">
+      <span>A <span class="tej-name">True Eyed Jack</span> app: Local First. Always Intelligent.</span>
+    </a>
+    <a href="https://github.com/ldjessee-code/orbit_match/blob/main/LICENSE">MIT License</a>
+  </div>
+  <p class="foot-mid">Turquenish setting, characters, and fiction © Lloyd Douglass Jessee 2025–2026. Not covered by the MIT License.</p>
+  <p class="foot-right">GM / author tool</p>
+</footer>
 <script type="module" src="viewer3d.js"></script>
 </body>
 </html>

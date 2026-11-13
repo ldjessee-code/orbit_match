@@ -91,9 +91,11 @@ export function clockDays(elapsed, epoch) {
   return (days == null ? 0 : days) - (t0 == null ? 0 : t0);
 }
 
+// The stored angles are at the system's own epoch, so elapsed day 0 is that
+// epoch whatever its t0_days. clockDays stays for a reader that needs days on
+// the t0 count.
 export function viewAtClock(view, system, state, systemId) {
   const next = Object.assign({}, view || {});
-  const epoch = system && system.epoch;
-  next.epoch_days = clockDays(elapsedDays(state, systemId), epoch);
+  next.epoch_days = elapsedDays(state, systemId);
   return next;
 }

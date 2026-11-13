@@ -1,5 +1,6 @@
+/* Room for the fixed site footer, so it does not cover the picture. */
 body {
-  padding-bottom: 0;
+  padding-bottom: 3.1rem;
 }
 
 header.site-head {
@@ -80,8 +81,17 @@ main.viewer-main {
 }
 
 #load-status {
-  min-height: 1.2rem;
+  margin: 0;
   color: var(--warn);
+}
+
+/* An empty status line takes no room above the picture. */
+#load-status:empty {
+  display: none;
+}
+
+.dock .file-btn input[type="file"] {
+  max-width: 14rem;
 }
 
 #stage {

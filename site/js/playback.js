@@ -10,6 +10,7 @@ import {
   VIEWER_STATE_KEY,
   elapsedDays,
   readViewerState,
+  setElapsedDays,
   stepElapsed,
   writeViewerState
 } from './viewer-state.js';
@@ -106,6 +107,10 @@ export function createPlaybackController(deps) {
     const t = stampOf(stamp);
     const due = !!force || lastWriteAt == null || (t - lastWriteAt) >= WRITE_INTERVAL_MS;
     if (due) {
+      // Write this system's clock into what is stored now, so another tab's
+      // clock for another system is kept.
+      const id = systemIdOf(env);
+      memory = setElapsedDays(readViewerState(env.storage), id, elapsedDays(memory, id));
       writeViewerState(memory, env.storage);
       lastWriteAt = t;
     }

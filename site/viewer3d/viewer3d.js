@@ -1,7 +1,15 @@
 import { loadView } from '../js/schema.js';
 import { cardLinks, VIEWER_SYSTEM_ID } from '../js/builder-link.js';
 import { applyShell } from '../js/shell.js';
-import { isHandoff, isLoreSystem, resolveSystem, safeSystemFile } from '../js/system-source.js';
+import {
+  fetchJson,
+  fillSelect,
+  keepSystemInLinks,
+  loadFailText,
+  loadRequestedSystem,
+  systemFromText,
+  tripChoices
+} from '../js/viewer-common.js';
 import {
   collectBrowserSignals,
   decideViewer,
@@ -9,6 +17,12 @@ import {
   resourceDestination,
   writeResourceStorage
 } from '../js/low-resource.js';
+import {
+  readViewerState,
+  systemIdFromSearch,
+  viewAtClock
+} from '../js/viewer-state.js';
+import { mountPlaybackDock } from '../js/playback.js';
 import { loreSettingsFromSystem, loreSettingsMarkup } from './lore-settings.js';
 import { polarLimits, cameraPose, clampElevation } from './frame.js';
 import {
@@ -36,7 +50,8 @@ import {
   selectFromPick,
   assignCardSlots,
   calloutLines,
-  choosePick
+  choosePick,
+  hasSubmap
 } from './scene-model.js';
 import {
   DENSITY_DEFAULT,
@@ -61,10 +76,15 @@ import {
 import {
   modelFileForBody,
   modelMountPlan,
+  modelDisplayRadius,
   defaultLayerState,
   setLayerVisible,
   layerVisibleForNode,
-  isGlbRingNode
+  shouldHideGlbRingNode,
+  applyBodyModelLoadResult,
+  jumpgateRingBodyLabel,
+  jumpgateRingScaleNote,
+  isJumpgateRingBody
 } from './body-models.js';
 
 let loadedSystem = null;
@@ -104,6 +124,11 @@ let dustSprite = null;
 let BodyGLTFLoader = null;
 let modelGeneration = 0;
 let layerState = defaultLayerState();
+let playback = null;
+
+export function bindTimeDock(env) {
+  return mountPlaybackDock(env);
+}
 
 function showFallback() {
   const el = document.getElementById('fallback');
@@ -130,13 +155,6 @@ function webglContext(surface) {
   }
 }
 
-function fetchJson(url) {
-  return fetch(url).then(function (response) {
-    if (!response.ok) throw new Error(url + ' ' + response.status);
-    return response.json();
-  });
-}
-
 function modeLabel(mode) {
   return mode === 'linear' ? 'True AU' : 'Schematic';
 }
@@ -147,7 +165,8 @@ function viewNow() {
   next.distance_mode = session.distance_mode;
   next.elevation_deg = session.elevation_deg;
   next.azimuth_deg = session.azimuth_deg;
-  return next;
+  const state = playback && playback.viewerState ? playback.viewerState() : readViewerState();
+  return viewAtClock(next, loadedSystem, state, currentClockId());
 }
 
 function stageSize() {
@@ -259,7 +278,8 @@ function syncLabels(data) {
   data.bodies.forEach(function (body) {
     const el = document.createElement('span');
     el.className = 'body-label';
-    el.textContent = body.name;
+    const base = body.submap ? body.name + ' ·' : body.name;
+    el.textContent = isJumpgateRingBody(body.id) ? jumpgateRingBodyLabel(base, false) : base;
     host.appendChild(el);
     labelEntries.push({ el: el, position: body.position });
   });
@@ -284,10 +304,36 @@ function placeLabels() {
 }
 
 function paintCrumbs() {
-  const systemCrumb = document.getElementById('crumb-system');
-  const focusCrumb = document.getElementById('crumb-focus');
-  if (systemCrumb) systemCrumb.setAttribute('aria-current', frame === 'system' ? 'true' : 'false');
-  if (focusCrumb) focusCrumb.setAttribute('aria-current', frame === 'system' ? 'false' : 'true');
+  const host = document.getElementById('crumbs');
+  if (!host) return;
+  const star = (loadedSystem && loadedSystem.star) || {};
+  let focusBody = null;
+  if (frame && frame !== 'system' && loadedSystem) {
+    focusBody = (loadedSystem.bodies || []).find(function (body) { return body.id === frame; }) || null;
+    if (!focusBody || !hasSubmap(loadedSystem, focusBody.id)) {
+      if (frame !== 'system') {
+        frame = 'system';
+        if (playback) playback.setClose(frame !== 'system');
+      }
+      focusBody = null;
+    }
+  }
+  let html = '<button type="button" id="crumb-system" data-frame="system"' +
+    (frame === 'system' ? ' aria-current="true"' : '') + '>' + crumbText(star.name || 'System') + '</button>';
+  if (focusBody) {
+    html += '<span aria-hidden="true">/</span>';
+    html += '<button type="button" id="crumb-focus" data-frame="' + crumbText(frame) + '" aria-current="true">' +
+      crumbText(focusBody.name || frame) + '</button>';
+  }
+  host.innerHTML = html;
+}
+
+function crumbText(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function bodyDisplayName(id) {
@@ -329,7 +375,12 @@ function paintCards() {
     const card = document.createElement('article');
     card.className = 'card';
     card.dataset.corner = slot.corner;
-    calloutLines(loadedSystem, key, sceneTransfers).forEach(function (line) {
+    const lines = calloutLines(loadedSystem, key, sceneTransfers).slice();
+    if (isJumpgateRingBody(id)) {
+      const noteLine = jumpgateRingScaleNote(false);
+      if (noteLine) lines.push(noteLine);
+    }
+    lines.forEach(function (line) {
       const row = document.createElement('p');
       row.textContent = line;
       card.appendChild(row);
@@ -713,7 +764,7 @@ function mountFromPlan(host, gltf, plan) {
   const model = gltf.scene;
   model.scale.setScalar(plan.scale);
   model.traverse(function (child) {
-    if (isGlbRingNode(child.name)) {
+    if (shouldHideGlbRingNode(child.name, plan.pickId)) {
       child.visible = false;
       return;
     }
@@ -736,9 +787,9 @@ function scheduleBodyModels(root, data) {
   if (!BodyGLTFLoader || !root || !data) return;
   const loader = new BodyGLTFLoader();
   const jobs = [];
-  if (data.star) jobs.push({ id: 'star', radius: data.star.radius });
+  if (data.star) jobs.push({ id: 'star', radius: modelDisplayRadius('star', data.star.radius) });
   (data.bodies || []).forEach(function (body) {
-    jobs.push({ id: body.id, radius: body.radius });
+    jobs.push({ id: body.id, radius: modelDisplayRadius(body.id, body.radius) });
   });
   jobs.forEach(function (job) {
     const file = modelFileForBody(job.id, loadedSystem);
@@ -749,18 +800,16 @@ function scheduleBodyModels(root, data) {
         return;
       }
       const host = findBodyHost(root, job.id);
-      const plan = modelMountPlan(host ? { ok: true } : { ok: false }, job.id, job.radius, file);
+      const plan = applyBodyModelLoadResult(host, !!(host && gltf && gltf.scene), job.id, job.radius, file);
       if (!host || plan.fallback) {
         if (gltf.scene) disposeObject(gltf.scene);
-        if (host) host.userData.modelFallback = true;
         return;
       }
       mountFromPlan(host, gltf, plan);
     }).catch(function () {
       if (generation !== modelGeneration) return;
       const host = findBodyHost(root, job.id);
-      const plan = modelMountPlan({ ok: false }, job.id, job.radius, file);
-      if (host && plan.fallback) host.userData.modelFallback = true;
+      applyBodyModelLoadResult(host, false, job.id, job.radius, file);
     });
   });
 }
@@ -820,25 +869,88 @@ function bindLoreSettings(THREE, root) {
   });
 }
 
-async function loadRequestedSystem() {
-  const params = new URLSearchParams(location.search);
-  const requested = params.get('system');
-  let loreName = 'tau-ceti.system.json';
-  if (requested) {
-    const withSuffix = /\.system\.json$/i.test(requested) ? requested : requested + '.system.json';
-    const safe = safeSystemFile(withSuffix);
-    if (!safe) throw new Error('system name is not allowed');
-    loreName = safe;
-  }
-  const handoffName = loreName.replace(/\.system\.json$/i, '.handoff.json');
-  let lore = null;
-  let handoff = null;
-  try { lore = await fetchJson('../data/' + loreName); } catch (err) { lore = null; }
-  try { handoff = await fetchJson('../data/' + handoffName); } catch (err) { handoff = null; }
-  if (lore && !isLoreSystem(lore)) lore = null;
-  if (handoff && !isHandoff(handoff)) handoff = null;
-  if (!lore && !handoff) throw new Error('system file missing');
-  return resolveSystem({ lore: lore, handoff: handoff });
+function storageOrNull() {
+  try { return typeof localStorage === 'undefined' ? null : localStorage; } catch (err) { return null; }
+}
+
+// A file the visitor opened keeps its own clock, apart from ?system=.
+let clockId = null;
+
+function currentClockId() {
+  if (clockId) return clockId;
+  const search = typeof location === 'undefined' ? '' : location.search;
+  return systemIdFromSearch(search);
+}
+
+function paintTrip() {
+  if (!loadedSystem || !loadedView) return;
+  const rows = tripChoices(loadedSystem);
+  const spec = loadedView.transfer || {};
+  fillSelect(document, document.getElementById('trip-from'), rows, spec.from, 'No trip');
+  fillSelect(document, document.getElementById('trip-to'), rows, spec.to, 'No trip');
+}
+
+function bindPageControls(THREE, root) {
+  const from = document.getElementById('trip-from');
+  const to = document.getElementById('trip-to');
+  const chooseTrip = function () {
+    if (!loadedView) return;
+    const a = from ? from.value : '';
+    const b = to ? to.value : '';
+    loadedView = Object.assign({}, loadedView, {
+      transfer: a && b ? Object.assign({}, loadedView.transfer || {}, { from: a, to: b }) : null
+    });
+    rebuild(THREE, root, false);
+    paintCards();
+  };
+  if (from) from.addEventListener('change', chooseTrip);
+  if (to) to.addEventListener('change', chooseTrip);
+  const go = document.getElementById('goto-day-go');
+  const day = document.getElementById('goto-day');
+  if (go && day) go.addEventListener('click', function () {
+    const target = Number(day.value);
+    if (!playback || day.value === '' || !Number.isFinite(target)) return;
+    playback.step(target - playback.elapsed());
+  });
+  const reset = document.getElementById('reset-epoch');
+  if (reset) reset.addEventListener('click', function () {
+    if (playback) playback.step(-playback.elapsed());
+  });
+  const picker = document.getElementById('system-file');
+  const status = document.getElementById('load-status');
+  if (picker) picker.addEventListener('change', function () {
+    const file = picker.files && picker.files[0];
+    picker.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+      try {
+        const system = systemFromText(String(reader.result), file.name);
+        clockId = 'file:' + file.name;
+        loadedSystem = system;
+        loadedView = Object.assign(loadView({ orbit_match_view: 1 }), { theme: themeName });
+        dataLayers = layersFromSystem(loadedSystem);
+        layerState = dataLayers.length ? defaultLayerState(dataLayers) : defaultLayerState();
+        fillBeltControl(loadedSystem);
+        frame = 'system';
+        session = Object.assign(initialSession(loadedView), {
+          elevation_deg: session.elevation_deg,
+          azimuth_deg: session.azimuth_deg
+        });
+        if (playback) playback.setClose(false);
+        paintTrip();
+        rebuild(THREE, root, true);
+        paintCards();
+        if (status) status.textContent = 'Opened ' + file.name + '.';
+      } catch (err) {
+        if (status) status.textContent = loadFailText(err) + ' The picture did not change.';
+      }
+    };
+    reader.onerror = function () {
+      if (status) status.textContent = file.name + ' could not be read. The picture did not change.';
+    };
+    reader.readAsText(file);
+  });
 }
 
 function rebuild(THREE, root, resetCamera) {
@@ -910,6 +1022,15 @@ function rebuild(THREE, root, resetCamera) {
       mesh.add(ring);
     }
     root.add(mesh);
+  });
+  (data.moonlets || []).forEach(function (moonlet) {
+    const marker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 10, 8),
+      new THREE.MeshStandardMaterial({ color: '#d8c9a3', roughness: 1, metalness: 0 })
+    );
+    marker.position.set(moonlet.position.x, moonlet.position.y, moonlet.position.z);
+    tagMesh(marker, moonlet.id, { a_km: moonlet.a_km }, moonlet.position);
+    root.add(marker);
   });
   data.orbits.forEach(function (orbit) {
     const line = lineGeom(THREE, orbit.points, 0xd4f0ff, true);
@@ -1010,9 +1131,9 @@ function tick() {
 }
 
 async function startViewer(THREE, OrbitControls, gl) {
-  const viewFile = await fetchJson('../data/tau-ceti.view.json');
-  loadedSystem = await loadRequestedSystem();
-  loadedView = loadView(viewFile);
+  const loaded = await loadRequestedSystem(location.search, storageOrNull());
+  loadedSystem = loaded.system;
+  loadedView = loaded.view;
   dataLayers = layersFromSystem(loadedSystem);
   layerState = dataLayers.length ? defaultLayerState(dataLayers) : defaultLayerState();
   fillBeltControl(loadedSystem);
@@ -1097,25 +1218,44 @@ async function startViewer(THREE, OrbitControls, gl) {
       rebuild(THREE, root, false);
     });
   }
-  const timeButton = document.getElementById('time-play');
-  if (timeButton) {
-    timeButton.addEventListener('click', function () {
-      timeButton.textContent = 'Time ×1, paused';
+  const timeDock = document.querySelector('.dock');
+  if (timeDock) {
+    playback = bindTimeDock({
+      document: document,
+      window: window,
+      dock: timeDock,
+      storage: typeof localStorage === 'undefined' ? null : localStorage,
+      now: function () {
+        return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      },
+      requestFrame: function (fn) {
+        if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(fn);
+        return setTimeout(function () { fn(Date.now()); }, 16);
+      },
+      cancelFrame: function (id) {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(id);
+        clearTimeout(id);
+      },
+      onPaint: function () {
+        if (!loadedSystem) return;
+        rebuild(THREE, root, false);
+      },
+      systemId: function () { return currentClockId(); },
+      isClose: function () { return frame !== 'system'; }
     });
   }
-  const crumbSystem = document.getElementById('crumb-system');
-  const crumbFocus = document.getElementById('crumb-focus');
-  if (crumbSystem) {
-    crumbSystem.addEventListener('click', function () {
-      frame = 'system';
-      session = Object.assign({}, session, { focused: null });
-      rebuild(THREE, root, true);
-    });
-  }
-  if (crumbFocus) {
-    crumbFocus.addEventListener('click', function () {
-      frame = crumbFocus.getAttribute('data-frame') || 'tc5';
-      session = Object.assign({}, session, { focused: frame });
+  bindPageControls(THREE, root);
+  paintTrip();
+  const crumbHost = document.getElementById('crumbs');
+  if (crumbHost) {
+    crumbHost.addEventListener('click', function (event) {
+      const button = event.target.closest ? event.target.closest('button') : null;
+      if (!button || !crumbHost.contains(button)) return;
+      const next = button.getAttribute('data-frame') || 'system';
+      if (next !== 'system' && !hasSubmap(loadedSystem, next)) return;
+      frame = next;
+      if (playback) playback.setClose(frame !== 'system');
+      session = Object.assign({}, session, { focused: next === 'system' ? null : next });
       rebuild(THREE, root, true);
     });
   }
@@ -1171,14 +1311,16 @@ async function startViewer(THREE, OrbitControls, gl) {
     }
     if (hit.id === 'star') {
       frame = 'system';
+      if (playback) playback.setClose(frame !== 'system');
       session = Object.assign({}, session, { focused: null });
       rebuild(THREE, root, true);
       paintCards();
       return;
     }
-    if (hit.id === 'tc5' && frame !== 'tc5') {
-      frame = 'tc5';
-      session = frameBody(session, 'tc5');
+    if (hasSubmap(loadedSystem, hit.id) && frame !== hit.id) {
+      frame = hit.id;
+      if (playback) playback.setClose(frame !== 'system');
+      session = frameBody(session, hit.id);
       rebuild(THREE, root, true);
       paintCards();
       return;
@@ -1223,6 +1365,7 @@ function bindResourceToggle() {
 async function boot() {
   if (typeof document === 'undefined') return;
   const choice = decideViewer({
+    page: '3d',
     search: location.search,
     stored: readResourceStorage(),
     signals: collectBrowserSignals(),
@@ -1235,6 +1378,7 @@ async function boot() {
   }
   bindResourceToggle();
   applyShell(document);
+  keepSystemInLinks(document, location.search);
   stage = document.getElementById('stage');
   canvas = stage ? stage.querySelector('canvas') : null;
   if (!canvas) {
@@ -1266,7 +1410,7 @@ async function boot() {
     await startViewer(THREE, OrbitControls, gl);
   } catch (err) {
     const status = document.getElementById('load-status');
-    if (status) status.textContent = 'The system file did not load. Open this page from the static server.';
+    if (status) status.textContent = loadFailText(err);
   }
 }
 

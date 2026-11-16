@@ -11,18 +11,68 @@ export const BODY_MODEL_FILE = {
   tc5a: 'shudder.glb',
   tc5b: 'der-eindringling.glb',
   tc6: 'croquet-ball.glb',
+  tc6gate: 'jumpgate-ring-v4.glb',
   tc7: 'cue-ball.glb',
   tc8: 'eight-ball.glb'
 };
 
-export function isGlbRingNode(name) {
-  return /ring/i.test(String(name == null ? '' : name));
+export const JUMPGATE_RING_BODY_ID = 'tc6gate';
+export const JUMPGATE_RING_TRUE_OUTER_RADIUS_M = 515.625;
+// Outer radius of the jumpgate ring in the system view, in scene units.
+// True outer radius is 515.625 m (1.03125 km across). At AU scale that is
+// invisible, so the ring is drawn at 0.36: larger than the old marker
+// (~0.236) and smaller than Croquet Ball / tc6 (~0.402). About 100000
+// times the true size next to tc6. The drawn size is never the true size
+// in the normal view.
+export const JUMPGATE_RING_DISPLAY_OUTER_RADIUS = 0.36;
+export const JUMPGATE_RING_ENLARGE_FACTOR = 100000;
+
+export function isJumpgateRingBody(id) {
+  return id === JUMPGATE_RING_BODY_ID;
 }
 
+export function ringModelScale(displayOuterRadius) {
+  const radius = Number(displayOuterRadius);
+  if (!Number.isFinite(radius) || radius <= 0) return null;
+  return radius / JUMPGATE_RING_TRUE_OUTER_RADIUS_M;
+}
+
+export function modelDisplayRadius(id, sceneRadius) {
+  if (isJumpgateRingBody(id)) return JUMPGATE_RING_DISPLAY_OUTER_RADIUS;
+  return sceneRadius;
+}
+
+export function shouldHideGlbRingNode(nodeName, bodyId) {
+  if (isJumpgateRingBody(bodyId)) return false;
+  return isGlbRingNode(nodeName);
+}
+
+export function jumpgateRingScaleNote(trueScale) {
+  if (trueScale) return '';
+  return 'Jumpgate ring: drawn about ' + JUMPGATE_RING_ENLARGE_FACTOR +
+    ' times its true size so it can be seen. Not to scale.';
+}
+
+export function jumpgateRingBodyLabel(name, trueScale) {
+  const base = name == null ? '' : String(name);
+  if (trueScale) return base;
+  if (!base) return 'not to scale';
+  return base + ' (not to scale)';
+}
+
+// "ring" as a word or a capitalized part of a name: SM_planet_ring,
+// Jumpgate_Ring_Root, CueRing. Not inside another word, as in SM_spring_tree.
+export function isGlbRingNode(name) {
+  return /(^|[^a-zA-Z])[Rr]ing|Ring/.test(String(name == null ? '' : name));
+}
+
+// A model is a path inside the site. An address with a scheme or a leading
+// // is refused, so a shared file cannot make the viewer call a server.
 function cleanModelPath(value) {
   if (typeof value !== 'string') return null;
   const text = value.trim();
   if (!text || text.indexOf('..') >= 0 || text.indexOf('\\') >= 0 || text.indexOf('\n') >= 0) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(text) || text.indexOf('//') === 0) return null;
   if (!/\.glb$/i.test(text)) return null;
   return text.replace(/^\//, '');
 }
@@ -37,15 +87,27 @@ function modelFromSystem(id, system) {
   return undefined;
 }
 
+// The built-in table is the model pack for one system. It applies to that
+// system, or when no system is given. Any other system names its own models.
+export const BODY_MODEL_PACK_HOST = 'tau Cet';
+
+function packApplies(system) {
+  if (!system || typeof system !== 'object') return true;
+  const star = system.star && typeof system.star === 'object' ? system.star : {};
+  return star.hostname === BODY_MODEL_PACK_HOST;
+}
+
 export function modelFileForBody(id, system) {
   const fromData = modelFromSystem(id, system);
   if (fromData !== undefined) return fromData;
+  if (!packApplies(system)) return null;
   const file = BODY_MODEL_FILE[id];
   if (!file) return null;
   return 'models/' + file;
 }
 
-export function modelScale(displayRadius) {
+export function modelScale(displayRadius, id) {
+  if (isJumpgateRingBody(id)) return ringModelScale(displayRadius);
   const radius = Number(displayRadius);
   if (!Number.isFinite(radius) || radius <= 0) return null;
   return radius;
@@ -54,11 +116,20 @@ export function modelScale(displayRadius) {
 export function modelMountPlan(result, id, displayRadius, fileOverride) {
   const pickId = id == null ? null : String(id);
   const file = fileOverride !== undefined ? fileOverride : modelFileForBody(pickId);
-  const scale = modelScale(displayRadius);
+  const scale = modelScale(displayRadius, pickId);
   if (!(result && result.ok && file && scale != null)) {
     return { pickId: pickId, fallback: true, hideSphere: false, scale: null, file: file };
   }
   return { pickId: pickId, fallback: false, hideSphere: true, scale: scale, file: file };
+}
+
+export function applyBodyModelLoadResult(host, loadOk, id, displayRadius, file) {
+  const plan = modelMountPlan(loadOk ? { ok: true } : { ok: false }, id, displayRadius, file);
+  if (host) {
+    if (!host.userData) host.userData = {};
+    host.userData.modelFallback = !!plan.fallback;
+  }
+  return plan;
 }
 
 // South winter ice matches the blend hide_render and the r3 preview (north cap only).
@@ -110,10 +181,20 @@ function layerNodeName(layer) {
   return layer.node == null ? '' : layer.node;
 }
 
+// Two bodies may both have a "clouds" layer. A key used once is its own
+// state key. A key used again is keyed by its node too, so each body keeps
+// its own switch and default.
+export function layerStateKey(layer, layers) {
+  const list = layerCatalog(layers);
+  const shared = list.filter(function (item) { return item && item.key === layer.key; }).length > 1;
+  return shared ? layer.key + ':' + layerNodeName(layer) : layer.key;
+}
+
 export function defaultLayerState(layers) {
   const state = {};
-  layerCatalog(layers).forEach(function (layer) {
-    state[layer.key] = layerDefault(layer);
+  const list = layerCatalog(layers);
+  list.forEach(function (layer) {
+    state[layerStateKey(layer, list)] = layerDefault(layer);
   });
   return state;
 }
@@ -142,7 +223,8 @@ export function layerVisibleForNode(nodeName, state, layers) {
   for (let i = 0; i < list.length; i++) {
     const layer = list[i];
     if (layerNodeName(layer) !== nodeName) continue;
-    if (state && typeof state[layer.key] === 'boolean') return state[layer.key];
+    const key = layerStateKey(layer, list);
+    if (state && typeof state[key] === 'boolean') return state[key];
     return layerDefault(layer);
   }
   return null;

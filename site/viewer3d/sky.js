@@ -291,7 +291,10 @@ export function starfieldRgba(width, height, seed) {
   const stars = Math.max(8, Math.round((width * height) / 240));
   for (let s = 0; s < stars; s++) {
     const x = Math.floor(rng() * width);
-    const y = Math.floor(rng() * height);
+    // Equal sky area per star: latitude from asin(2u - 1), so the poles of
+    // the equirectangular map are not crowded.
+    const lat = Math.asin(2 * rng() - 1);
+    const y = Math.min(height - 1, Math.floor((0.5 - lat / Math.PI) * height));
     const bright = Math.pow(rng(), 4);
     const mag = 36 + Math.floor(bright * 219);
     const temp = rng();
@@ -352,7 +355,10 @@ export function skyBackgroundRotation(sky) {
 export function skyReference(system) {
   const sky = system && system.sky && typeof system.sky === 'object' ? system.sky : null;
   const raw = sky && typeof sky.equirect === 'string' ? sky.equirect.trim() : '';
-  const url = raw && raw.indexOf('..') < 0 && raw.indexOf('\\') < 0 ? raw : '';
+  // A sky image is a path inside the site. An address with a scheme
+  // (https:, data:, javascript:) or a leading // is refused.
+  const local = raw && !/^[a-z][a-z0-9+.-]*:/i.test(raw) && raw.indexOf('//') !== 0;
+  const url = local && raw.indexOf('..') < 0 && raw.indexOf('\\') < 0 ? raw : '';
   return {
     mode: url ? 'equirect' : 'procedural',
     url: url || null,

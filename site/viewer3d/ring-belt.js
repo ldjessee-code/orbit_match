@@ -27,7 +27,8 @@ function finiteOr(value, fallback) {
 }
 
 function clampDensity(density) {
-  if (!Number.isFinite(Number(density))) return DENSITY_DEFAULT;
+  // A blank density is the default. Number(null) would be 0, which draws nothing.
+  if (density == null || density === '' || !Number.isFinite(Number(density))) return DENSITY_DEFAULT;
   let index = Math.round(Number(density));
   if (index < DENSITY_MIN) index = DENSITY_MIN;
   if (index > DENSITY_MAX) index = DENSITY_MAX;
@@ -242,11 +243,10 @@ function bodyById(system, id) {
 export function cueBallRingSource(system) {
   const stored = system && system.rings_belts && system.rings_belts.cue_ball_ring_source;
   if (stored) return String(stored);
-  const cue = bodyById(system, 'tc7');
-  if (cue && cue.ring_system && Array.isArray(cue.ring_system.bands) && cue.ring_system.bands.length) {
-    return 'data-belt';
-  }
-  return 'solid';
+  const banded = ((system && system.bodies) || []).some(function (body) {
+    return body && body.ring_system && Array.isArray(body.ring_system.bands) && body.ring_system.bands.length;
+  });
+  return banded ? 'data-belt' : 'solid';
 }
 
 export function solidRingForBody(system, bodyId) {
@@ -270,9 +270,25 @@ function bandInnerOuterKm(band) {
   return { innerKm: taggedValue(band.r_in_km), outerKm: taggedValue(band.r_out_km) };
 }
 
+// Each ringed body gets its own run of seeds, 20 apart, in file order.
+function ringSeedOffset(system, id) {
+  const ringed = ((system && system.bodies) || []).filter(function (body) {
+    return body && body.ring_system && Array.isArray(body.ring_system.bands);
+  });
+  const index = ringed.findIndex(function (body) { return body.id === id; });
+  return 20 * (index < 0 ? ringed.length : index);
+}
+
+function degToRad(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? (value * Math.PI) / 180 : 0;
+}
+
 export function planetRingsFromScene(system, scene) {
   const list = [];
   const sceneBodies = (scene && scene.bodies) || [];
+  const closeFrame = !!(scene && scene.frame && scene.frame !== 'system' && Number(scene.extentKm) > 0 && Number(scene.closeSpan) > 0);
+  const extent = closeFrame ? Number(scene.extentKm) : 0;
+  const span = closeFrame ? Number(scene.closeSpan) : 0;
   ((system && system.bodies) || []).forEach(function (src) {
     const ringSys = src.ring_system;
     if (!ringSys || !Array.isArray(ringSys.bands)) return;
@@ -283,17 +299,17 @@ export function planetRingsFromScene(system, scene) {
     ringSys.bands.forEach(function (band, index) {
       if (!band || band.draw === false) return;
       const name = band.name == null ? '' : String(band.name);
-      if (/gap/i.test(name) || name === 'phoebe_like') return;
+      if (/gap/i.test(name)) return;
       const km = bandInnerOuterKm(band);
       if (!(km.innerKm > 0) || !(km.outerKm > km.innerKm)) return;
-      let innerR = ringKmToScene(km.innerKm, planetKm, display);
-      let outerR = ringKmToScene(km.outerKm, planetKm, display);
+      let innerR = closeFrame ? (km.innerKm / extent) * span : ringKmToScene(km.innerKm, planetKm, display);
+      let outerR = closeFrame ? (km.outerKm / extent) * span : ringKmToScene(km.outerKm, planetKm, display);
       if (outerR < innerR) {
         const swap = innerR;
         innerR = outerR;
         outerR = swap;
       }
-      if (outerR - innerR < 0.004) {
+      if (!closeFrame && outerR - innerR < 0.004) {
         const mid = (innerR + outerR) / 2;
         innerR = mid - 0.002;
         outerR = mid + 0.002;
@@ -312,8 +328,9 @@ export function planetRingsFromScene(system, scene) {
         innerRadius: innerR,
         outerRadius: outerR,
         thickness: thickness,
-        inclination: 0,
-        seed: SKY_SEED + 200 + index + (src.id === 'tc6' ? 0 : src.id === 'tc7' ? 20 : 40),
+        // Rings lie in the planet's equator, so its axial tilt tilts them.
+        inclination: degToRad(src.physical && src.physical.tilt_deg),
+        seed: SKY_SEED + 200 + index + ringSeedOffset(system, src.id),
         density: DENSITY_DEFAULT,
         dustiness: tauToDustiness(band.tau),
         countShare: tauToCountShare(band.tau),

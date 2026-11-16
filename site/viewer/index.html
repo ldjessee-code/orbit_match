@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tau Ceti — Orbit Match</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>System view — Orbit Match</title>
+<link rel="icon" href="../img/true-eyed-jack.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../css/site.css">
 <link rel="stylesheet" href="viewer.css">
 <script src="../js/theme.js"></script>
@@ -25,6 +27,7 @@
   <nav>
     <a href="../">Home</a>
     <a href="../manual/">Build a system</a>
+    <a href="../viewer3d/?view=3d">3D view</a>
     <a id="star-map" href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
     <a id="setting" href="https://ldjessee-code.github.io/jumpgate_starroute/docs/lore/#crowded/overview">Turquenish</a>
     <a href="plates/">Chrome plates</a>
@@ -33,19 +36,60 @@
 <main class="viewer-main">
   <div class="dock">
     <p id="crumbs">
-      <button type="button" id="crumb-system" data-frame="system">Tau Ceti</button>
-      <span aria-hidden="true">/</span>
-      <button type="button" id="crumb-focus" data-frame="tc5">Kakakiko</button>
+      <button type="button" id="crumb-system" data-frame="system">System</button>
     </p>
-    <label>Zoom <input id="zoom" type="range" min="1" max="8" value="1" disabled></label>
-    <label>Elevation <input id="elev" type="range" min="15" max="75" value="20" disabled> <span>20°</span></label>
-    <button type="button" id="time-play" disabled>Time ×1, paused</button>
+    <label class="file-btn">Open a system file
+      <input id="system-file" type="file" accept=".json,application/json">
+    </label>
+    <label>Zoom <input id="zoom" type="range" min="1" max="8" step="0.5" value="1"></label>
+    <label>Elevation <input id="elev" type="range" min="15" max="75" value="20"> <span id="elev-value">20°</span></label>
+    <label>Trip from
+      <select id="trip-from" aria-label="Trip from"></select>
+    </label>
+    <label>to
+      <select id="trip-to" aria-label="Trip to"></select>
+    </label>
+    <button type="button" id="play-reverse" aria-pressed="false">Play reverse</button>
+    <button type="button" id="play-pause" aria-pressed="true">Pause</button>
+    <button type="button" id="play-forward" aria-pressed="false">Play forward</button>
+    <label>Speed
+      <select id="play-speed" aria-label="Playback speed">
+        <option value="d1" selected>1 day/sec</option>
+        <option value="d10">10 days/sec</option>
+        <option value="d100">100 days/sec</option>
+      </select>
+    </label>
+    <button type="button" id="time-back-10" data-days="-10">-10 days</button>
+    <button type="button" id="time-back" data-days="-1">-1 day</button>
+    <button type="button" id="time-fwd" data-days="1">+1 day</button>
+    <button type="button" id="time-fwd-10" data-days="10">+10 days</button>
+    <label>Go to day <input id="goto-day" type="number" step="any" inputmode="decimal" size="6"></label>
+    <button type="button" id="goto-day-go">Go</button>
+    <button type="button" id="reset-epoch">Back to the epoch</button>
     <button type="button" id="resource-toggle">3D view</button>
+    <p id="clock-day" aria-live="polite"></p>
     <p id="readout" aria-live="polite"></p>
   </div>
-  <p id="load-status"></p>
-  <div id="sky"></div>
+  <p id="load-status" aria-live="polite"></p>
+  <div class="viewer-body">
+    <div id="sky"></div>
+    <nav class="body-list-box" aria-label="Bodies">
+      <p class="body-list-title">Bodies</p>
+      <ul id="body-list" class="body-list"></ul>
+    </nav>
+  </div>
 </main>
+<footer class="site-foot">
+  <div class="foot-left">
+    <a class="tej-brand" href="https://trueeyedjack.com/" target="_blank" rel="noopener noreferrer">
+      <img src="../img/true-eyed-jack.svg" alt="" width="36" height="36">
+      <span>A <span class="tej-name">True Eyed Jack</span> app: Local First. Always Intelligent.</span>
+    </a>
+    <a href="https://github.com/ldjessee-code/orbit_match/blob/main/LICENSE">MIT License</a>
+  </div>
+  <p class="foot-mid">Turquenish setting, characters, and fiction © Lloyd Douglass Jessee 2025–2026. Not covered by the MIT License.</p>
+  <p class="foot-right">GM / author tool</p>
+</footer>
 <script type="module" src="viewer.js"></script>
 </body>
 </html>

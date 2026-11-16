@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Build a system · Orbit Match</title>
+<link rel="icon" href="../img/true-eyed-jack.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../css/site.css">
 <link rel="stylesheet" href="manual.css">
 <script src="../js/theme.js"></script>
@@ -25,12 +27,18 @@
   </div>
   <nav>
     <a href="../">Home</a>
+    <a href="../viewer/?view=svg">SVG viewer</a>
+    <a href="../viewer3d/?view=3d">3D viewer</a>
     <a id="star-map" href="https://ldjessee-code.github.io/jumpgate_starroute/app.html">Star map</a>
     <a href="https://github.com/ldjessee-code/orbit_match/blob/main/INTERCONNECT.md">Interconnect</a>
   </nav>
 </header>
 <main>
   <p class="intro">Build one system by hand. The star stays at the start. Each step away from it is the next orbit. On a phone the orbits run down the page. On a wide screen they run across.</p>
+  <section class="angles-note" id="orbit-angles">
+    <h2>Orbit angles</h2>
+    <p>The system has one 0° direction in the system plane. Angles increase in the direction the planets orbit. 360° is the same as 0°. Each planet stores the position at the epoch and the longitude of perihelion, both in degrees from that direction. Type a number from 0 to 359.99, or use Random. Randomize all planets fills every planet and every moon. Belts stay blank. An empty epoch means day 0. A circular orbit still stores the perihelion angle. The position does not use it.</p>
+  </section>
   <p class="status" id="status">Loading the star list…</p>
   <div class="system" id="system">
     <section class="star-card" id="star-card">
@@ -53,6 +61,9 @@
         </label>
       </div>
       <div class="grid">
+        <label>Star name
+          <input data-header="hostname" autocomplete="off">
+        </label>
         <label>Setting name
           <input data-header="setting_name">
         </label>
@@ -67,6 +78,18 @@
         </label>
         <label>Temperature (K)
           <input data-header="teff" inputmode="decimal">
+        </label>
+        <label>Radius (sun)
+          <input data-header="rad" inputmode="decimal">
+        </label>
+        <label>X (light years)
+          <input data-header="x" inputmode="decimal">
+        </label>
+        <label>Y (light years)
+          <input data-header="y" inputmode="decimal">
+        </label>
+        <label>Z (light years)
+          <input data-header="z" inputmode="decimal">
         </label>
         <label>Known planets
           <input data-header="planets" inputmode="numeric">
@@ -95,11 +118,33 @@
         <label class="wide">Services
           <input data-header="services" placeholder="fuel, repair, trade">
         </label>
+        <label class="wide">Tags
+          <input data-header="tags" placeholder="frontier, mining">
+        </label>
+        <label>Imports
+          <input data-header="imports">
+        </label>
+        <label>Exports
+          <input data-header="exports">
+        </label>
+        <label>Epoch
+          <input data-header="epoch" placeholder="TBD (day 0)">
+        </label>
+        <label class="wide">Reference direction
+          <input data-header="reference_label" placeholder="toward the vernal point / arbitrary">
+        </label>
+        <label>Reference (deg)
+          <input data-header="reference_deg" inputmode="decimal">
+        </label>
       </div>
       <p class="note" id="zone-note" data-help="goldilocks"></p>
       <div class="actions">
         <button type="button" id="add-body">Add an orbital object</button>
+        <button type="button" id="randomize-all">Randomize all planets</button>
         <button type="button" id="save-system">Save this system</button>
+        <button type="button" id="view-system">View this system</button>
+        <button type="button" id="new-system">New system</button>
+        <button type="button" id="undo" disabled>Undo</button>
       </div>
     </section>
     <div class="stack" id="stack"></div>

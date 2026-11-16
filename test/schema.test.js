@@ -196,7 +196,7 @@ test('tau ceti fixture matches the v2.41c copy list', async function () {
   const raw = readJson(fixturePath);
   const loaded = schema.loadSystem(raw);
   assert.equal(loaded.lore.version, 'v2.41c');
-  assert.equal(loaded.lore.source, 'F:\\Dropbox\\Projects\\Turquenish\\systems\\tauCet\\Tau_Cet_system_v2.md');
+  assert.equal(loaded.lore.source, 'Turquenish/systems/tauCet/Tau_Cet_system_v2.md');
   assert.deepEqual(loaded.lore.copied, Object.keys(copied));
   for (const dotted of loaded.lore.copied) {
     assert.equal(valueAt(loaded, dotted), copied[dotted], dotted);
@@ -222,12 +222,84 @@ test('the view file accepts quiet, holo, empire, and mardat', async function () 
   assert.equal(schema.loadView({ orbit_match_view: 1, elevation_deg: 80 }).elevation_deg, 75);
 });
 
+test('angle_deg stays put and position_angle round-trips on a moon', async function () {
+  const schema = await import('../site/js/schema.js');
+  const tau = schema.loadSystem(readJson(fixturePath));
+  const yard = body(tau, 'yard');
+  assert.equal(yard.angle_deg, 110);
+  assert.equal(yard.canon.angle_deg, 'locked');
+  assert.equal(yard.orbit.position_angle_deg, undefined);
+  const loaded = schema.loadSystem({
+    orbit_match: 2,
+    bodies: [{
+      id: 'm',
+      kind: 'moon',
+      parent: 'p',
+      angle_deg: 110,
+      orbit: { a_km: 1000, position_angle_deg: 360, perihelion_longitude_deg: 15 }
+    }]
+  });
+  const moon = body(loaded, 'm');
+  assert.equal(moon.angle_deg, 110);
+  assert.equal(moon.orbit.position_angle_deg, 0);
+  assert.equal(moon.orbit.perihelion_longitude_deg, 15);
+  assert.equal(moon.position_angle_deg, undefined);
+  const raw = JSON.stringify(readJson(fixturePath));
+  assert.equal(JSON.stringify(readJson(fixturePath)), raw);
+});
+
 test('stability note is the v2.41c moon run', function () {
   const note = readJson(stabilityPath);
   const text = JSON.stringify(note);
+  assert.equal(note.source, 'Turquenish/systems/tauCet/Tau_Cet_system_v2.md');
   assert.match(text, /20,000/);
   assert.match(text, /2:1/);
   assert.doesNotMatch(text, /4\.5 year/);
   assert.equal(note.moons.drawn.a_km.shudder, 151060);
   assert.equal(note.moons.drawn.a_km.der, 240000);
+});
+
+test('epoch.game_datetime round-trips and a missing one stays empty', async function () {
+  const schema = await import('../site/js/schema.js');
+  const model = await import('../site/viewer3d/scene-model.js');
+  const tau = schema.loadSystem(readJson(fixturePath));
+  assert.equal(tau.epoch.t0_days, 0);
+  assert.equal(tau.epoch.label, 'T+0 (epoch)');
+  assert.equal(tau.epoch.canon, 'locked');
+  assert.equal(tau.epoch.game_datetime, '3629-01-01 00:00:01');
+  const tauView = schema.loadView(readJson(viewPath));
+  assert.equal(tauView.epoch_days, 0);
+  assert.doesNotMatch(JSON.stringify(tau), /elapsed_days/);
+  assert.doesNotMatch(JSON.stringify(tauView), /elapsed_days/);
+  const tauScene = model.buildScene(tau, tauView);
+  assert.equal(tauScene.epochLabel, 'T+0 (epoch) · 3629-01-01 00:00:01');
+  assert.doesNotMatch(tauScene.epochLabel, /placeholder/);
+  assert.doesNotMatch(tauScene.epochLabel, /March|ISO|game_datetime/);
+  const loaded = schema.loadSystem({
+    orbit_match: 2,
+    star: { name: 'Demo', mass_solar: 1 },
+    epoch: { t0_days: 0, label: 'Launch', canon: 'placeholder', game_datetime: '  3 March 2401  ' },
+    bodies: []
+  });
+  assert.equal(loaded.epoch.t0_days, 0);
+  assert.equal(loaded.epoch.canon, 'placeholder');
+  assert.equal(loaded.epoch.game_datetime, '3 March 2401');
+  const scene = model.buildScene(loaded, { elevation_deg: 20, azimuth_deg: 0, epoch_days: 0, layers: { orbits: false, belts: false, habitable: false, transfers: false, labels: false } });
+  assert.equal(scene.epochLabel, 'Launch (placeholder) · 3 March 2401');
+  const numbered = schema.loadSystem({
+    orbit_match: 2,
+    star: { name: 'Demo', mass_solar: 1 },
+    epoch: { t0_days: 5, label: 'Launch', game_datetime: 2401 },
+    bodies: []
+  });
+  assert.equal(numbered.epoch.t0_days, 5);
+  assert.equal(numbered.epoch.game_datetime, undefined);
+  const blank = schema.loadSystem({
+    orbit_match: 2,
+    star: { name: 'Demo', mass_solar: 1 },
+    epoch: { t0_days: 0, label: 'Launch', game_datetime: '   ' },
+    bodies: []
+  });
+  assert.equal(blank.epoch.game_datetime, undefined);
+  assert.match(fs.readFileSync(path.join(root, 'docs', 'FORMATS.md'), 'utf8'), /game_datetime/);
 });

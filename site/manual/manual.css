@@ -85,6 +85,11 @@ button { cursor: pointer; }
 
 .note { color: var(--muted); font-size: 0.9rem; }
 
+.angles-note { max-width: 46rem; }
+.angles-note h2 { font-size: 1.15rem; margin: 0 0 0.35rem; }
+.angles-note p { margin: 0; color: var(--muted); }
+.angle-row { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; align-items: end; }
+
 .stack { display: flex; flex-direction: column; gap: 0.75rem; }
 .band { display: flex; flex-direction: column; gap: 0.75rem; }
 .band-gold {
@@ -148,3 +153,24 @@ details summary { cursor: pointer; margin: 0.4rem 0; }
 @media (max-width: 899px) {
   .star-card { position: static; }
 }
+
+/* Backup and replace questions. */
+dialog.ask {
+  max-width: min(560px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 20px;
+}
+dialog.ask::backdrop { background: rgba(0, 0, 0, 0.6); }
+dialog.ask h2 { margin: 0 0 12px; font-size: 1.15rem; }
+dialog.ask p { margin: 0 0 10px; }
+.ask-changes {
+  max-height: 40vh;
+  overflow: auto;
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: var(--muted);
+}
+.ask-actions { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -1,0 +1,75 @@
+{
+  "orbit_match": 2,
+  "kind": "system",
+  "note": "Made-up test fixture. Not Turquenish and not Tau Ceti. The numbers are not lore.",
+  "epoch": { "t0_days": 0, "label": "T+0" },
+  "reference_direction": { "label": "toward the vernal point / arbitrary", "deg": 0 },
+  "star": { "hostname": "Spread", "name": "Spread", "mass_solar": 1 },
+  "bodies": [
+    {
+      "id": "p0",
+      "name": "Plain",
+      "kind": "planet",
+      "parent": null,
+      "orbit": { "a_au": 1, "e": 0, "period_days": 100 }
+    },
+    {
+      "id": "p1",
+      "name": "Locked",
+      "kind": "planet",
+      "parent": null,
+      "orbit": { "a_au": 2, "e": 0, "period_days": 200, "position_angle_deg": 15, "perihelion_longitude_deg": 40 }
+    },
+    {
+      "id": "p2",
+      "name": "Mean",
+      "kind": "planet",
+      "parent": null,
+      "orbit": { "a_au": 3, "e": 0, "period_days": 300, "mean_anomaly_deg": 200 }
+    },
+    {
+      "id": "gate",
+      "name": "Gate",
+      "kind": "structure",
+      "parent": null,
+      "orbit": { "a_au": 3.5, "e": 0, "period_days": 400 },
+      "lagrange": { "of": "p2", "point": "L4" }
+    },
+    {
+      "id": "mStored",
+      "name": "Stored Moon",
+      "kind": "moon",
+      "parent": "p1",
+      "orbit": { "a_km": 10000, "e": 0, "period_days": 4, "position_angle_deg": 33 }
+    },
+    {
+      "id": "mMiss",
+      "name": "Missing Moon",
+      "kind": "moon",
+      "parent": "p1",
+      "orbit": { "a_km": 20000, "e": 0, "period_days": 8 }
+    },
+    {
+      "id": "mAngle",
+      "name": "Angle Moon",
+      "kind": "moon",
+      "parent": "p1",
+      "angle_deg": 77,
+      "orbit": { "a_km": 30000, "e": 0, "period_days": 12, "mean_anomaly_deg": 10 }
+    },
+    {
+      "id": "mMiss2",
+      "name": "Far Moon",
+      "kind": "moon",
+      "parent": "p1",
+      "orbit": { "a_km": 40000, "e": 0, "period_days": 16 }
+    },
+    {
+      "id": "dust",
+      "name": "Dust",
+      "kind": "belt",
+      "parent": null,
+      "orbit": { "a_inner_au": 4, "a_outer_au": 5 }
+    }
+  ]
+}
